@@ -34,7 +34,6 @@ interface Listing {
 
 const SearchPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [listings, setListings] = useState<Listing[]>([]);
   const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>([]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [showFilters, setShowFilters] = useState(false);
@@ -108,7 +107,6 @@ const SearchPage: React.FC = () => {
 
         console.log("Listings response:", response.data);
 
-        setListings(response.data.listings || []);
         setPagination(
           response.data.pagination || {
             currentPage: 1,

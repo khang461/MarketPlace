@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../config/api";
 import { mockVehicles, mockTransactions } from "../data/mockData";
+import Swal from "sweetalert2";
 
 interface UserData {
   _id?: string;
@@ -14,8 +15,25 @@ interface UserData {
   phone?: string;
   avatar?: string;
   createdAt?: string;
+  updatedAt?: string;
   role?: string;
   status?: string;
+  emailVerified?: boolean;
+  dateOfBirth?: string;
+  gender?: string;
+  isActive?: boolean;
+  addresses?: {
+    _id?: string;
+    fullAddress?: string;
+    ward?: string;
+    district?: string;
+    city?: string;
+    province?: string;
+    isDefault?: boolean;
+    isActive?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+  };
   stats?: {
     soldCount?: number;
     buyCount?: number;
@@ -29,6 +47,21 @@ const AccountPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState("profile");
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    fullName: "",
+    avatar: "",
+    gender: "",
+    dateOfBirth: "",
+    addresses: {
+      fullAddress: "",
+      ward: "",
+      district: "",
+      city: "",
+      province: "",
+      isActive: true,
+    },
+  });
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
@@ -49,11 +82,12 @@ const AccountPage: React.FC = () => {
         const token = localStorage.getItem("token");
         console.log("Token:", token ? "exists" : "not found");
 
-        const response = await api.get(`/users/${userId}`);
-        console.log("User data response:", response.data);
+        const response = await api.get(`/profiles`);
+        console.log("Profile data response:", response.data);
 
-        // Backend có thể trả về data trực tiếp hoặc trong một object
+        // Backend có thể trả về data trực tiếp hoặc trong object user
         const userData = response.data.user || response.data;
+        console.log("Processed user data:", userData);
         setUserData(userData);
       } catch (error: unknown) {
         console.error("Error fetching user data:", error);
@@ -76,6 +110,143 @@ const AccountPage: React.FC = () => {
 
     fetchUserData();
   }, [isAuthenticated, user, navigate]);
+
+  // Khởi tạo form edit khi có dữ liệu user
+  useEffect(() => {
+    if (userData) {
+      setEditForm({
+        fullName: userData.fullName || "",
+        avatar: userData.avatar || "",
+        gender: userData.gender || "",
+        dateOfBirth: userData.dateOfBirth
+          ? userData.dateOfBirth.split("T")[0]
+          : "",
+        addresses: {
+          fullAddress: userData.addresses?.fullAddress || "",
+          ward: userData.addresses?.ward || "",
+          district: userData.addresses?.district || "",
+          city: userData.addresses?.city || "",
+          province: userData.addresses?.province || "",
+          isActive: userData.addresses?.isActive || true,
+        },
+      });
+    }
+  }, [userData]);
+
+  // Hàm cập nhật profile
+  const handleUpdateProfile = async () => {
+    // Validation
+    if (!editForm.fullName.trim()) {
+      Swal.fire({
+        title: "Thiếu thông tin",
+        text: "Vui lòng nhập họ và tên!",
+        icon: "warning",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#F59E0B",
+      });
+      return;
+    }
+
+    if (!editForm.gender) {
+      Swal.fire({
+        title: "Thiếu thông tin",
+        text: "Vui lòng chọn giới tính!",
+        icon: "warning",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#F59E0B",
+      });
+      return;
+    }
+
+    if (!editForm.dateOfBirth) {
+      Swal.fire({
+        title: "Thiếu thông tin",
+        text: "Vui lòng chọn ngày sinh!",
+        icon: "warning",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#F59E0B",
+      });
+      return;
+    }
+
+    if (!editForm.addresses.fullAddress.trim()) {
+      Swal.fire({
+        title: "Thiếu thông tin",
+        text: "Vui lòng nhập địa chỉ đầy đủ!",
+        icon: "warning",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#F59E0B",
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const response = await api.put("/profiles", editForm);
+      console.log("Update profile response:", response.data);
+
+      // Cập nhật lại dữ liệu user
+      setUserData(response.data.user || response.data);
+      setIsEditing(false);
+
+      // Hiển thị thông báo thành công
+      Swal.fire({
+        title: "Thành công!",
+        text: "Cập nhật thông tin cá nhân thành công!",
+        icon: "success",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#3B82F6",
+      });
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      Swal.fire({
+        title: "Lỗi!",
+        text: "Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại!",
+        icon: "error",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#EF4444",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Hàm hủy chỉnh sửa
+  const handleCancelEdit = async () => {
+    const result = await Swal.fire({
+      title: "Xác nhận",
+      text: "Bạn có chắc muốn hủy chỉnh sửa? Tất cả thay đổi sẽ bị mất.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#EF4444",
+      cancelButtonColor: "#6B7280",
+      confirmButtonText: "Có, hủy bỏ",
+      cancelButtonText: "Tiếp tục chỉnh sửa",
+    });
+
+    if (result.isConfirmed) {
+      setIsEditing(false);
+      // Reset form về dữ liệu gốc
+      if (userData) {
+        setEditForm({
+          fullName: userData.fullName || "",
+          avatar: userData.avatar || "",
+          gender: userData.gender || "",
+          dateOfBirth: userData.dateOfBirth
+            ? userData.dateOfBirth.split("T")[0]
+            : "",
+          addresses: {
+            fullAddress: userData.addresses?.fullAddress || "",
+            ward: userData.addresses?.ward || "",
+            district: userData.addresses?.district || "",
+            city: userData.addresses?.city || "",
+            province: userData.addresses?.province || "",
+            isActive: userData.addresses?.isActive || true,
+          },
+        });
+      }
+    }
+  };
 
   const userListings = mockVehicles.filter(
     (v) => v.sellerId === (userData?._id || user?.id)
@@ -157,125 +328,396 @@ const AccountPage: React.FC = () => {
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold">Thông tin cá nhân</h2>
-                <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                  <Edit className="w-4 h-4" />
-                  <span>Chỉnh sửa</span>
-                </button>
+                {!isEditing ? (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Edit className="w-4 h-4" />
+                    <span>Chỉnh sửa</span>
+                  </button>
+                ) : (
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleUpdateProfile}
+                      disabled={isLoading}
+                      className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                    >
+                      <span>{isLoading ? "Đang lưu..." : "Lưu"}</span>
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      <span>Hủy</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="flex items-start space-x-6">
-                <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center">
-                  {currentUser?.avatar ? (
-                    <img
-                      src={currentUser.avatar}
-                      alt={currentUser.fullName || currentUser.name}
-                      className="w-24 h-24 rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-2xl font-bold text-gray-600">
-                      {(
-                        currentUser?.fullName ||
-                        currentUser?.name ||
-                        "U"
-                      ).charAt(0)}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold mb-2">
-                    {currentUser?.fullName || currentUser?.name}
-                  </h3>
-                  <div className="space-y-2 text-gray-600">
-                    <p>
-                      <strong>Email:</strong> {currentUser?.email}
-                    </p>
-                    <p>
-                      <strong>Số điện thoại:</strong>{" "}
-                      {currentUser?.phone || "Chưa cập nhật"}
-                    </p>
-                    <p>
-                      <strong>Ngày tham gia:</strong>{" "}
-                      {currentUser?.createdAt
-                        ? new Date(currentUser.createdAt).toLocaleDateString(
-                            "vi-VN"
-                          )
-                        : "N/A"}
-                    </p>
-                    <p>
-                      <strong>Vai trò:</strong>{" "}
-                      {currentUser?.role === "ADMIN"
-                        ? "Quản trị viên"
-                        : "Người dùng"}
-                    </p>
-                    <p>
-                      <strong>Trạng thái:</strong>{" "}
-                      <span
-                        className={
-                          currentUser?.status === "ACTIVE"
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }
-                      >
-                        {currentUser?.status === "ACTIVE"
-                          ? "Hoạt động"
-                          : "Không hoạt động"}
+              {!isEditing ? (
+                // Hiển thị thông tin
+                <div className="flex items-start space-x-6">
+                  <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center">
+                    {currentUser?.avatar ? (
+                      <img
+                        src={currentUser.avatar}
+                        alt={currentUser.fullName || currentUser.name}
+                        className="w-24 h-24 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-2xl font-bold text-gray-600">
+                        {(
+                          currentUser?.fullName ||
+                          currentUser?.name ||
+                          "U"
+                        ).charAt(0)}
                       </span>
-                    </p>
+                    )}
+                  </div>
+
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold mb-2">
+                      {currentUser?.fullName || currentUser?.name}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-600">
+                      <div className="space-y-2">
+                        <p>
+                          <strong>Email:</strong> {currentUser?.email}
+                          {currentUser?.emailVerified ? (
+                            <span className="ml-2 text-green-600 text-sm">
+                              ✓ Đã xác thực
+                            </span>
+                          ) : (
+                            <span className="ml-2 text-orange-600 text-sm">
+                              ⚠ Chưa xác thực
+                            </span>
+                          )}
+                        </p>
+                        <p>
+                          <strong>Số điện thoại:</strong>{" "}
+                          {currentUser?.phone || "Chưa cập nhật"}
+                        </p>
+                        <p>
+                          <strong>Ngày sinh:</strong>{" "}
+                          {currentUser?.dateOfBirth
+                            ? new Date(
+                                currentUser.dateOfBirth
+                              ).toLocaleDateString("vi-VN")
+                            : "Chưa cập nhật"}
+                        </p>
+                        <p>
+                          <strong>Giới tính:</strong>{" "}
+                          {currentUser?.gender === "male"
+                            ? "Nam"
+                            : currentUser?.gender === "female"
+                            ? "Nữ"
+                            : "Chưa cập nhật"}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <p>
+                          <strong>Ngày tham gia:</strong>{" "}
+                          {currentUser?.createdAt
+                            ? new Date(
+                                currentUser.createdAt
+                              ).toLocaleDateString("vi-VN")
+                            : "N/A"}
+                        </p>
+                        <p>
+                          <strong>Vai trò:</strong>{" "}
+                          {currentUser?.role === "ADMIN"
+                            ? "Quản trị viên"
+                            : "Người dùng"}
+                        </p>
+                        <p>
+                          <strong>Trạng thái:</strong>{" "}
+                          <span
+                            className={
+                              currentUser?.status === "ACTIVE"
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }
+                          >
+                            {currentUser?.status === "ACTIVE"
+                              ? "Hoạt động"
+                              : "Không hoạt động"}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Địa chỉ */}
+                    <div className="mt-4">
+                      <h4 className="font-semibold text-gray-800 mb-2">
+                        Địa chỉ
+                      </h4>
+                      {currentUser?.addresses ? (
+                        <div className="bg-gray-50 p-3 rounded-lg">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="font-medium">
+                                {currentUser.addresses.fullAddress}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {currentUser.addresses.ward},{" "}
+                                {currentUser.addresses.district},{" "}
+                                {currentUser.addresses.city},{" "}
+                                {currentUser.addresses.province}
+                              </p>
+                            </div>
+                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                              Mặc định
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-gray-50 p-4 rounded-lg text-center">
+                          <User className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                          <p className="text-gray-600 text-sm mb-3">
+                            Bạn chưa có địa chỉ nào
+                          </p>
+                          <button className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
+                            Thêm địa chỉ
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                // Form chỉnh sửa
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Họ và tên *
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.fullName}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              fullName: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Nhập họ và tên"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Avatar URL
+                        </label>
+                        <input
+                          type="url"
+                          value={editForm.avatar}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, avatar: e.target.value })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="https://example.com/avatar.jpg"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Giới tính *
+                        </label>
+                        <select
+                          value={editForm.gender}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, gender: e.target.value })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Chọn giới tính</option>
+                          <option value="male">Nam</option>
+                          <option value="female">Nữ</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Ngày sinh *
+                        </label>
+                        <input
+                          type="date"
+                          value={editForm.dateOfBirth}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              dateOfBirth: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="font-semibold text-gray-800">
+                        Thông tin địa chỉ
+                      </h4>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Địa chỉ đầy đủ *
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.addresses.fullAddress}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              addresses: {
+                                ...editForm.addresses,
+                                fullAddress: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="123 Đường ABC"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Phường/Xã *
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.addresses.ward}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                addresses: {
+                                  ...editForm.addresses,
+                                  ward: e.target.value,
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Phường 1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Quận/Huyện *
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.addresses.district}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                addresses: {
+                                  ...editForm.addresses,
+                                  district: e.target.value,
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Quận 1"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Thành phố *
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.addresses.city}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                addresses: {
+                                  ...editForm.addresses,
+                                  city: e.target.value,
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="TP.HCM"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Tỉnh *
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.addresses.province}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                addresses: {
+                                  ...editForm.addresses,
+                                  province: e.target.value,
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Hồ Chí Minh"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white rounded-lg shadow-md p-6 text-center">
-                <Package className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-                <h3 className="text-lg font-semibold">
-                  {currentUser?.stats?.soldCount || 0}
-                </h3>
-                <p className="text-gray-600">Đã bán</p>
-              </div>
+            {/* Thống kê hoạt động */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-semibold mb-4">Thống kê hoạt động</h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="text-center">
+                  <Package className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                  <h4 className="text-xl font-semibold">
+                    {currentUser?.stats?.soldCount || 0}
+                  </h4>
+                  <p className="text-gray-600 text-sm">Đã bán</p>
+                </div>
 
-              <div className="bg-white rounded-lg shadow-md p-6 text-center">
-                <Clock className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                <h3 className="text-lg font-semibold">
-                  {currentUser?.stats?.buyCount || 0}
-                </h3>
-                <p className="text-gray-600">Đã mua</p>
-              </div>
+                <div className="text-center">
+                  <Clock className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                  <h4 className="text-xl font-semibold">
+                    {currentUser?.stats?.buyCount || 0}
+                  </h4>
+                  <p className="text-gray-600 text-sm">Đã mua</p>
+                </div>
 
-              <div className="bg-white rounded-lg shadow-md p-6 text-center">
-                <User className="w-8 h-8 text-orange-600 mx-auto mb-2" />
-                <h3 className="text-lg font-semibold">
-                  {currentUser?.stats?.cancelRate || 0}%
-                </h3>
-                <p className="text-gray-600">Tỷ lệ hủy</p>
-              </div>
+                <div className="text-center">
+                  <User className="w-8 h-8 text-orange-600 mx-auto mb-2" />
+                  <h4 className="text-xl font-semibold">
+                    {currentUser?.stats?.cancelRate || 0}%
+                  </h4>
+                  <p className="text-gray-600 text-sm">Tỷ lệ hủy</p>
+                </div>
 
-              <div className="bg-white rounded-lg shadow-md p-6 text-center">
-                <Clock className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-                <h3 className="text-lg font-semibold">
-                  {currentUser?.stats?.responseTime || 0}
-                </h3>
-                <p className="text-gray-600">Thời gian phản hồi</p>
-              </div>
+                <div className="text-center">
+                  <Clock className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+                  <h4 className="text-xl font-semibold">
+                    {currentUser?.stats?.responseTime || 0}h
+                  </h4>
+                  <p className="text-gray-600 text-sm">Thời gian phản hồi</p>
+                </div>
 
-              <div className="bg-white rounded-lg shadow-md p-6 text-center">
-                <Package className="w-8 h-8 text-teal-600 mx-auto mb-2" />
-                <h3 className="text-lg font-semibold">
-                  {currentUser?.stats?.completionRate || 0}%
-                </h3>
-                <p className="text-gray-600">Tỷ lệ hoàn thành</p>
-              </div>
-
-              <div className="bg-white rounded-lg shadow-md p-6 text-center">
-                <User className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
-                <h3 className="text-lg font-semibold">
-                  {currentUser?.role === "ADMIN"
-                    ? "Quản trị viên"
-                    : "Người dùng"}
-                </h3>
-                <p className="text-gray-600">Vai trò</p>
+                <div className="text-center">
+                  <Package className="w-8 h-8 text-teal-600 mx-auto mb-2" />
+                  <h4 className="text-xl font-semibold">
+                    {currentUser?.stats?.completionRate || 0}%
+                  </h4>
+                  <p className="text-gray-600 text-sm">Tỷ lệ hoàn thành</p>
+                </div>
               </div>
             </div>
           </div>
