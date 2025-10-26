@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Search,
   Menu,
@@ -11,17 +11,176 @@ import {
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { useAuth } from "../../contexts/AuthContext";
+import api from "../../config/api";
+
+interface SearchSuggestion {
+  query: string;
+  count: number;
+  lastSearched: string;
+}
+
+interface SearchHistoryItem {
+  _id: string;
+  searchQuery: string;
+  searchDate: string;
+  resultsCount: number;
+}
+
+interface PopularSearch {
+  query: string;
+  count: number;
+  category: string;
+}
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
+  const [popularSearches, setPopularSearches] = useState<PopularSearch[]>([]);
+  const searchRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user, logout } = useAuth();
+
+  // Reset search query khi chuyển trang (trừ trang search)
+  useEffect(() => {
+    if (!location.pathname.startsWith("/search")) {
+      setSearchQuery("");
+      setShowSuggestions(false);
+    }
+  }, [location.pathname]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        searchRef.current &&
+        !searchRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Fetch search history when component mounts (nếu user đã đăng nhập)
+  useEffect(() => {
+    const fetchSearchHistory = async () => {
+      if (!isAuthenticated) return;
+
+      try {
+        const response = await api.get("/search/history", {
+          params: { limit: "5" },
+        });
+        setSearchHistory(response.data.data || []);
+      } catch (error) {
+        console.error("Error fetching search history:", error);
+      }
+    };
+
+    fetchSearchHistory();
+  }, [isAuthenticated]);
+
+  // Fetch popular searches
+  useEffect(() => {
+    const fetchPopularSearches = async () => {
+      try {
+        const response = await api.get("/search/popular", {
+          params: { limit: "5" },
+        });
+        setPopularSearches(response.data.data || []);
+      } catch (error) {
+        console.error("Error fetching popular searches:", error);
+      }
+    };
+
+    fetchPopularSearches();
+  }, []);
+
+  // Fetch suggestions when user types
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (searchQuery.trim().length < 2) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+
+      setIsLoadingSuggestions(true);
+      try {
+        // Chỉ sử dụng API /search/suggestions
+        const response = await api.get("/search/suggestions", {
+          params: {
+            keyword: searchQuery.trim(),
+            limit: "8",
+          },
+        });
+
+        setSuggestions(response.data.data || []);
+        setShowSuggestions(true);
+      } catch (error) {
+        console.error("Error fetching suggestions:", error);
+        setSuggestions([]);
+      } finally {
+        setIsLoadingSuggestions(false);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchSuggestions, 300); // Debounce 300ms
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
+      // Lưu lịch sử tìm kiếm nếu user đã đăng nhập
+      if (isAuthenticated) {
+        saveSearchToHistory(searchQuery.trim());
+      }
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: SearchSuggestion) => {
+    const query = suggestion.query;
+    setSearchQuery(query);
+
+    // Lưu lịch sử tìm kiếm nếu user đã đăng nhập
+    if (isAuthenticated) {
+      saveSearchToHistory(query);
+    }
+
+    navigate(`/search?q=${encodeURIComponent(query)}`);
+    setShowSuggestions(false);
+  };
+
+  const handleHistoryClick = (query: string) => {
+    setSearchQuery(query);
+    navigate(`/search?q=${encodeURIComponent(query)}`);
+    setShowSuggestions(false);
+  };
+
+  // Lưu lịch sử tìm kiếm vào backend
+  const saveSearchToHistory = async (query: string) => {
+    try {
+      await api.post("/search/history/save", {
+        searchQuery: query,
+        searchType: "listing",
+      });
+
+      // Refresh search history
+      const response = await api.get("/search/history", {
+        params: { limit: "5" },
+      });
+      setSearchHistory(response.data.data || []);
+    } catch (error) {
+      console.error("Error saving search history:", error);
     }
   };
 
@@ -41,11 +200,19 @@ const Header: React.FC = () => {
 
           {/* Search Bar */}
           <form onSubmit={handleSearch} className="flex-1 max-w-2xl mx-8">
-            <div className="relative">
+            <div className="relative" ref={searchRef}>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => {
+                  if (searchQuery.length >= 2) {
+                    setShowSuggestions(true);
+                  } else if (searchQuery.length === 0) {
+                    // Hiển thị search history và popular searches khi chưa gõ gì
+                    setShowSuggestions(true);
+                  }
+                }}
                 placeholder="Tìm kiếm xe, pin, phụ kiện..."
                 className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
@@ -55,6 +222,119 @@ const Header: React.FC = () => {
               >
                 <Search className="w-5 h-5" />
               </button>
+
+              {/* Suggestions Dropdown */}
+              {showSuggestions && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto z-50">
+                  {searchQuery.length === 0 ? (
+                    // Hiển thị search history và popular searches khi chưa gõ
+                    <div>
+                      {/* Search History */}
+                      {isAuthenticated && searchHistory.length > 0 && (
+                        <div className="border-b border-gray-200">
+                          <div className="px-4 py-2 bg-gray-50">
+                            <p className="text-xs font-semibold text-gray-500 uppercase">
+                              Lịch sử tìm kiếm
+                            </p>
+                          </div>
+                          <ul>
+                            {searchHistory.map((item) => (
+                              <li
+                                key={item._id}
+                                onClick={() =>
+                                  handleHistoryClick(item.searchQuery)
+                                }
+                                className="px-4 py-2 hover:bg-gray-50 cursor-pointer flex items-center justify-between"
+                              >
+                                <span className="text-gray-700">
+                                  {item.searchQuery}
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                  {item.resultsCount} kết quả
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Popular Searches */}
+                      {popularSearches.length > 0 && (
+                        <div>
+                          <div className="px-4 py-2 bg-gray-50">
+                            <p className="text-xs font-semibold text-gray-500 uppercase">
+                              Tìm kiếm phổ biến
+                            </p>
+                          </div>
+                          <ul>
+                            {popularSearches.map((item, index) => (
+                              <li
+                                key={index}
+                                onClick={() => handleHistoryClick(item.query)}
+                                className="px-4 py-2 hover:bg-gray-50 cursor-pointer flex items-center justify-between"
+                              >
+                                <span className="text-gray-700">
+                                  {item.query}
+                                </span>
+                                <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-600">
+                                  {item.category === "popular"
+                                    ? "Phổ biến"
+                                    : item.category === "trending"
+                                    ? "Xu hướng"
+                                    : "Mới"}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Empty state */}
+                      {(!isAuthenticated || searchHistory.length === 0) &&
+                        popularSearches.length === 0 && (
+                          <div className="p-4 text-center text-gray-500">
+                            <p className="text-sm">Bắt đầu tìm kiếm...</p>
+                          </div>
+                        )}
+                    </div>
+                  ) : isLoadingSuggestions ? (
+                    <div className="p-4 text-center text-gray-500">
+                      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p className="mt-2 text-sm">Đang tìm kiếm...</p>
+                    </div>
+                  ) : suggestions.length > 0 ? (
+                    <ul className="py-2">
+                      {suggestions.map((suggestion, index) => (
+                        <li
+                          key={index}
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {suggestion.query}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {suggestion.count} lần tìm kiếm
+                              </p>
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {new Date(
+                                suggestion.lastSearched
+                              ).toLocaleDateString("vi-VN")}
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="p-4 text-center text-gray-500">
+                      <p className="text-sm">Không tìm thấy kết quả</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </form>
 
