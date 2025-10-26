@@ -22,14 +22,13 @@ interface UserData {
   dateOfBirth?: string;
   gender?: string;
   isActive?: boolean;
-  addresses?: {
+  address?: {
     _id?: string;
     fullAddress?: string;
     ward?: string;
     district?: string;
     city?: string;
     province?: string;
-    isDefault?: boolean;
     isActive?: boolean;
     createdAt?: string;
     updatedAt?: string;
@@ -53,7 +52,7 @@ const AccountPage: React.FC = () => {
     avatar: "",
     gender: "",
     dateOfBirth: "",
-    addresses: {
+    address: {
       fullAddress: "",
       ward: "",
       district: "",
@@ -121,13 +120,13 @@ const AccountPage: React.FC = () => {
         dateOfBirth: userData.dateOfBirth
           ? userData.dateOfBirth.split("T")[0]
           : "",
-        addresses: {
-          fullAddress: userData.addresses?.fullAddress || "",
-          ward: userData.addresses?.ward || "",
-          district: userData.addresses?.district || "",
-          city: userData.addresses?.city || "",
-          province: userData.addresses?.province || "",
-          isActive: userData.addresses?.isActive || true,
+        address: {
+          fullAddress: userData.address?.fullAddress || "",
+          ward: userData.address?.ward || "",
+          district: userData.address?.district || "",
+          city: userData.address?.city || "",
+          province: userData.address?.province || "",
+          isActive: userData.address?.isActive || true,
         },
       });
     }
@@ -169,7 +168,7 @@ const AccountPage: React.FC = () => {
       return;
     }
 
-    if (!editForm.addresses.fullAddress.trim()) {
+    if (!editForm.address.fullAddress.trim()) {
       Swal.fire({
         title: "Thiếu thông tin",
         text: "Vui lòng nhập địa chỉ đầy đủ!",
@@ -235,13 +234,13 @@ const AccountPage: React.FC = () => {
           dateOfBirth: userData.dateOfBirth
             ? userData.dateOfBirth.split("T")[0]
             : "",
-          addresses: {
-            fullAddress: userData.addresses?.fullAddress || "",
-            ward: userData.addresses?.ward || "",
-            district: userData.addresses?.district || "",
-            city: userData.addresses?.city || "",
-            province: userData.addresses?.province || "",
-            isActive: userData.addresses?.isActive || true,
+          address: {
+            fullAddress: userData.address?.fullAddress || "",
+            ward: userData.address?.ward || "",
+            district: userData.address?.district || "",
+            city: userData.address?.city || "",
+            province: userData.address?.province || "",
+            isActive: userData.address?.isActive || true,
           },
         });
       }
@@ -452,18 +451,18 @@ const AccountPage: React.FC = () => {
                       <h4 className="font-semibold text-gray-800 mb-2">
                         Địa chỉ
                       </h4>
-                      {currentUser?.addresses ? (
+                      {currentUser?.address ? (
                         <div className="bg-gray-50 p-3 rounded-lg">
                           <div className="flex items-start justify-between">
                             <div>
                               <p className="font-medium">
-                                {currentUser.addresses.fullAddress}
+                                {currentUser.address.fullAddress}
                               </p>
                               <p className="text-sm text-gray-600">
-                                {currentUser.addresses.ward},{" "}
-                                {currentUser.addresses.district},{" "}
-                                {currentUser.addresses.city},{" "}
-                                {currentUser.addresses.province}
+                                {currentUser.address.ward},{" "}
+                                {currentUser.address.district},{" "}
+                                {currentUser.address.city},{" "}
+                                {currentUser.address.province}
                               </p>
                             </div>
                             <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
@@ -569,12 +568,12 @@ const AccountPage: React.FC = () => {
                         </label>
                         <input
                           type="text"
-                          value={editForm.addresses.fullAddress}
+                          value={editForm.address.fullAddress}
                           onChange={(e) =>
                             setEditForm({
                               ...editForm,
-                              addresses: {
-                                ...editForm.addresses,
+                              address: {
+                                ...editForm.address,
                                 fullAddress: e.target.value,
                               },
                             })
@@ -591,12 +590,12 @@ const AccountPage: React.FC = () => {
                           </label>
                           <input
                             type="text"
-                            value={editForm.addresses.ward}
+                            value={editForm.address.ward}
                             onChange={(e) =>
                               setEditForm({
                                 ...editForm,
-                                addresses: {
-                                  ...editForm.addresses,
+                                address: {
+                                  ...editForm.address,
                                   ward: e.target.value,
                                 },
                               })
@@ -611,12 +610,12 @@ const AccountPage: React.FC = () => {
                           </label>
                           <input
                             type="text"
-                            value={editForm.addresses.district}
+                            value={editForm.address.district}
                             onChange={(e) =>
                               setEditForm({
                                 ...editForm,
-                                addresses: {
-                                  ...editForm.addresses,
+                                address: {
+                                  ...editForm.address,
                                   district: e.target.value,
                                 },
                               })
@@ -634,12 +633,12 @@ const AccountPage: React.FC = () => {
                           </label>
                           <input
                             type="text"
-                            value={editForm.addresses.city}
+                            value={editForm.address.city}
                             onChange={(e) =>
                               setEditForm({
                                 ...editForm,
-                                addresses: {
-                                  ...editForm.addresses,
+                                address: {
+                                  ...editForm.address,
                                   city: e.target.value,
                                 },
                               })
@@ -654,12 +653,12 @@ const AccountPage: React.FC = () => {
                           </label>
                           <input
                             type="text"
-                            value={editForm.addresses.province}
+                            value={editForm.address.province}
                             onChange={(e) =>
                               setEditForm({
                                 ...editForm,
-                                addresses: {
-                                  ...editForm.addresses,
+                                address: {
+                                  ...editForm.address,
                                   province: e.target.value,
                                 },
                               })
