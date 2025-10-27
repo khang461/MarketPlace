@@ -8,6 +8,8 @@ const PostListingPage: React.FC = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Giữ nguyên keys cũ + bổ sung Car fields
   const [formData, setFormData] = useState({
     // Basic Info
     type: "",
@@ -16,11 +18,20 @@ const PostListingPage: React.FC = () => {
     year: "",
     priceListed: "",
 
-    // Vehicle Details
+    // Vehicle Details (chung)
     mileageKm: "",
     batteryCapacityKWh: "",
     chargeCycles: "0",
     condition: "",
+
+    // Car-only (mẫu hợp đồng)
+    licensePlate: "",
+    engineDisplacementCc: "",
+    vehicleType: "",
+    paintColor: "",
+    engineNumber: "",
+    chassisNumber: "",
+    otherFeatures: "",
 
     // Location
     city: "",
@@ -37,139 +48,83 @@ const PostListingPage: React.FC = () => {
   // Validation function for each step
   const validateStep = (step: number): boolean => {
     switch (step) {
-      case 1:
-        // Bước 1: Thông tin cơ bản
+      case 1: {
         if (!formData.type) {
-          Swal.fire({
-            icon: "warning",
-            title: "Thiếu thông tin!",
-            text: "Vui lòng chọn loại sản phẩm",
-            confirmButtonColor: "#2563eb",
-          });
+          Swal.fire({ icon: "warning", title: "Thiếu thông tin!", text: "Vui lòng chọn loại sản phẩm", confirmButtonColor: "#2563eb" });
           return false;
         }
         if (!formData.make.trim()) {
-          Swal.fire({
-            icon: "warning",
-            title: "Thiếu thông tin!",
-            text: "Vui lòng nhập hãng xe",
-            confirmButtonColor: "#2563eb",
-          });
+          Swal.fire({ icon: "warning", title: "Thiếu thông tin!", text: "Vui lòng nhập hãng", confirmButtonColor: "#2563eb" });
           return false;
         }
         if (!formData.model.trim()) {
-          Swal.fire({
-            icon: "warning",
-            title: "Thiếu thông tin!",
-            text: "Vui lòng nhập mẫu xe",
-            confirmButtonColor: "#2563eb",
-          });
+          Swal.fire({ icon: "warning", title: "Thiếu thông tin!", text: "Vui lòng nhập model", confirmButtonColor: "#2563eb" });
           return false;
         }
-        if (
-          !formData.year ||
-          parseInt(formData.year) < 2000 ||
-          parseInt(formData.year) > 2025
-        ) {
-          Swal.fire({
-            icon: "warning",
-            title: "Thiếu thông tin!",
-            text: "Vui lòng nhập năm sản xuất hợp lệ (2000-2025)",
-            confirmButtonColor: "#2563eb",
-          });
+        const y = parseInt(formData.year);
+        if (!formData.year || !Number.isFinite(y) || y < 2000 || y > 2025) {
+          Swal.fire({ icon: "warning", title: "Thiếu thông tin!", text: "Vui lòng nhập năm sản xuất hợp lệ (2000-2025)", confirmButtonColor: "#2563eb" });
           return false;
         }
         if (!formData.priceListed || parseFloat(formData.priceListed) <= 0) {
-          Swal.fire({
-            icon: "warning",
-            title: "Thiếu thông tin!",
-            text: "Vui lòng nhập giá bán hợp lệ",
-            confirmButtonColor: "#2563eb",
-          });
+          Swal.fire({ icon: "warning", title: "Thiếu thông tin!", text: "Vui lòng nhập giá bán hợp lệ", confirmButtonColor: "#2563eb" });
           return false;
         }
         return true;
+      }
 
-      case 2:
-        // Bước 2: Thông số kỹ thuật
-        if (
-          formData.type === "Car" &&
-          (!formData.mileageKm || parseFloat(formData.mileageKm) < 0)
-        ) {
-          Swal.fire({
-            icon: "warning",
-            title: "Thiếu thông tin!",
-            text: "Vui lòng nhập số km đã chạy",
-            confirmButtonColor: "#2563eb",
-          });
-          return false;
+      case 2: {
+        // Car: yêu cầu mileageKm
+        if (formData.type === "Car") {
+          if (!formData.mileageKm || parseFloat(formData.mileageKm) < 0) {
+            Swal.fire({ icon: "warning", title: "Thiếu thông tin!", text: "Vui lòng nhập số km đã chạy", confirmButtonColor: "#2563eb" });
+            return false;
+          }
+          // Các trường hợp đồng Car không bắt buộc ở FE (có thể thêm sau nếu muốn)
         }
-        if (
-          !formData.batteryCapacityKWh ||
-          parseFloat(formData.batteryCapacityKWh) <= 0
-        ) {
-          Swal.fire({
-            icon: "warning",
-            title: "Thiếu thông tin!",
-            text: "Vui lòng nhập dung lượng pin",
-            confirmButtonColor: "#2563eb",
-          });
-          return false;
+
+        // Battery: yêu cầu batteryCapacityKWh
+        if (formData.type === "Battery") {
+          if (!formData.batteryCapacityKWh || parseFloat(formData.batteryCapacityKWh) <= 0) {
+            Swal.fire({ icon: "warning", title: "Thiếu thông tin!", text: "Vui lòng nhập dung lượng pin (kWh)", confirmButtonColor: "#2563eb" });
+            return false;
+          }
         }
+
         if (!formData.condition) {
-          Swal.fire({
-            icon: "warning",
-            title: "Thiếu thông tin!",
-            text: "Vui lòng chọn tình trạng",
-            confirmButtonColor: "#2563eb",
-          });
+          Swal.fire({ icon: "warning", title: "Thiếu thông tin!", text: "Vui lòng chọn tình trạng", confirmButtonColor: "#2563eb" });
           return false;
         }
         return true;
+      }
 
-      case 3:
-        // Bước 3: Hình ảnh
-        if (formData.images.length === 0) {
-          Swal.fire({
-            icon: "warning",
-            title: "Thiếu thông tin!",
-            text: "Vui lòng tải lên ít nhất 1 hình ảnh",
-            confirmButtonColor: "#2563eb",
-          });
+      case 3: {
+        if (formData.images.length < 3) {
+          Swal.fire({ icon: "warning", title: "Thiếu hình ảnh!", text: "Vui lòng tải lên ít nhất 3 hình ảnh", confirmButtonColor: "#2563eb" });
           return false;
         }
         return true;
+      }
 
-      case 4:
-        // Bước 4: Liên hệ
+      case 4: {
         if (!formData.city) {
-          Swal.fire({
-            icon: "warning",
-            title: "Thiếu thông tin!",
-            text: "Vui lòng chọn thành phố",
-            confirmButtonColor: "#2563eb",
-          });
+          Swal.fire({ icon: "warning", title: "Thiếu thông tin!", text: "Vui lòng chọn thành phố", confirmButtonColor: "#2563eb" });
           return false;
         }
         if (!formData.district.trim()) {
-          Swal.fire({
-            icon: "warning",
-            title: "Thiếu thông tin!",
-            text: "Vui lòng nhập quận/huyện",
-            confirmButtonColor: "#2563eb",
-          });
+          Swal.fire({ icon: "warning", title: "Thiếu thông tin!", text: "Vui lòng nhập quận/huyện", confirmButtonColor: "#2563eb" });
           return false;
         }
         if (!formData.address.trim()) {
-          Swal.fire({
-            icon: "warning",
-            title: "Thiếu thông tin!",
-            text: "Vui lòng nhập địa chỉ chi tiết",
-            confirmButtonColor: "#2563eb",
-          });
+          Swal.fire({ icon: "warning", title: "Thiếu thông tin!", text: "Vui lòng nhập địa chỉ chi tiết", confirmButtonColor: "#2563eb" });
+          return false;
+        }
+        if (!["meet", "ship", "consignment"].includes(formData.tradeMethod)) {
+          Swal.fire({ icon: "warning", title: "Phương thức giao dịch!", text: "Hãy chọn meet/ship/consignment", confirmButtonColor: "#2563eb" });
           return false;
         }
         return true;
+      }
 
       default:
         return true;
@@ -183,9 +138,7 @@ const PostListingPage: React.FC = () => {
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -224,7 +177,6 @@ const PostListingPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // Step 1: Tạo listing (POST /api/listings)
       const formDataToSend = new FormData();
 
       // Append text fields
@@ -232,18 +184,40 @@ const PostListingPage: React.FC = () => {
       formDataToSend.append("make", formData.make);
       formDataToSend.append("model", formData.model);
       formDataToSend.append("year", formData.year);
-      formDataToSend.append("batteryCapacityKWh", formData.batteryCapacityKWh);
+
+      // Battery fields (optional với Car)
+      if (formData.batteryCapacityKWh) formDataToSend.append("batteryCapacityKWh", formData.batteryCapacityKWh);
       formDataToSend.append("mileageKm", formData.mileageKm || "0");
       formDataToSend.append("chargeCycles", formData.chargeCycles || "0");
+
+      // Car-only (append nếu có)
+      if (formData.type === "Car") {
+        if (formData.licensePlate) formDataToSend.append("licensePlate", formData.licensePlate);
+        if (formData.engineDisplacementCc) formDataToSend.append("engineDisplacementCc", formData.engineDisplacementCc);
+        if (formData.vehicleType) formDataToSend.append("vehicleType", formData.vehicleType);
+        if (formData.paintColor) formDataToSend.append("paintColor", formData.paintColor);
+        if (formData.engineNumber) formDataToSend.append("engineNumber", formData.engineNumber);
+        if (formData.chassisNumber) formDataToSend.append("chassisNumber", formData.chassisNumber);
+        if (formData.otherFeatures) formDataToSend.append("otherFeatures", formData.otherFeatures);
+      }
+
       formDataToSend.append("condition", formData.condition);
       formDataToSend.append("priceListed", formData.priceListed);
       formDataToSend.append("tradeMethod", formData.tradeMethod);
       formDataToSend.append("sellerConfirm", "true");
 
-      // Location fields
-      formDataToSend.append("location[city]", formData.city);
-      formDataToSend.append("location[district]", formData.district);
-      formDataToSend.append("location[address]", formData.address);
+      // BẮT BUỘC: đồng ý điều khoản & phí hoa hồng
+      formDataToSend.append("commissionTermsAccepted", "true");
+
+      // Location: gửi 1 field duy nhất 'location' là JSON string (không còn \ khi hiển thị input)
+      formDataToSend.append(
+        "location",
+        JSON.stringify({
+          city: formData.city,
+          district: formData.district,
+          address: formData.address,
+        })
+      );
 
       // Append images
       formData.images.forEach((image) => {
@@ -252,14 +226,11 @@ const PostListingPage: React.FC = () => {
 
       // Create listing
       const createResponse = await api.post("/listings", formDataToSend, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
       const listingId = createResponse.data._id;
 
-      // Success - Cho user chọn xem tin hoặc gửi duyệt luôn
       const result = await Swal.fire({
         icon: "success",
         title: "Tạo tin đăng thành công!",
@@ -278,50 +249,36 @@ const PostListingPage: React.FC = () => {
       });
 
       if (result.isConfirmed) {
-        // User chọn gửi duyệt ngay
         try {
-          await api.post(`/listings/${listingId}/submit`);
-
+          await api.post(`/listings/${listingId}/submit`, { commissionTermsAccepted: true });
           await Swal.fire({
             icon: "success",
             title: "Đã gửi duyệt!",
-            text: "Tin đăng đã được gửi cho admin duyệt. Chúng tôi sẽ xem xét trong vòng 24h.",
+            text: "Tin đăng đã được gửi cho admin duyệt.",
             confirmButtonColor: "#2563eb",
           });
-
           navigate("/account");
         } catch (error) {
           console.error("Error submitting listing:", error);
-
           await Swal.fire({
             icon: "error",
             title: "Lỗi gửi duyệt!",
-            text: "Tin đăng đã được tạo nhưng không thể gửi duyệt. Vui lòng thử lại từ trang Tài khoản.",
+            text: "Tin đăng đã tạo nhưng không thể gửi duyệt. Vui lòng thử lại từ trang Tài khoản.",
             confirmButtonColor: "#dc2626",
           });
-
           navigate("/account");
         }
       } else if (result.isDenied) {
-        // User chọn xem tin đăng
         navigate(`/vehicle/${listingId}`);
       } else {
-        // User chọn về trang tài khoản
         navigate("/account");
       }
     } catch (error) {
       console.error("Error creating listing:", error);
-
       const errorMessage =
-        (error as { response?: { data?: { message?: string } } })?.response
-          ?.data?.message || "Đã có lỗi xảy ra khi đăng tin. Vui lòng thử lại!";
-
-      await Swal.fire({
-        icon: "error",
-        title: "Đăng tin thất bại!",
-        text: errorMessage,
-        confirmButtonColor: "#dc2626",
-      });
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        "Đã có lỗi xảy ra khi đăng tin. Vui lòng thử lại!";
+      await Swal.fire({ icon: "error", title: "Đăng tin thất bại!", text: errorMessage, confirmButtonColor: "#dc2626" });
     } finally {
       setIsSubmitting(false);
     }
@@ -361,7 +318,7 @@ const PostListingPage: React.FC = () => {
                   name="make"
                   value={formData.make}
                   onChange={handleInputChange}
-                  placeholder="VD: VinFast, Honda, Toyota..."
+                  placeholder="VD: VinFast, Toyota, Hyundai..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
@@ -371,14 +328,14 @@ const PostListingPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Mẫu xe *
+                  Model *
                 </label>
                 <input
                   type="text"
                   name="model"
                   value={formData.model}
                   onChange={handleInputChange}
-                  placeholder="VD: VF8 Plus, City, Camry..."
+                  placeholder="VD: VF8, City, Camry..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
@@ -394,8 +351,8 @@ const PostListingPage: React.FC = () => {
                   value={formData.year}
                   onChange={handleInputChange}
                   placeholder="2024"
-                  min="2000"
-                  max="2025"
+                  min={2000}
+                  max={2025}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
@@ -426,39 +383,161 @@ const PostListingPage: React.FC = () => {
             <h2 className="text-xl font-semibold">Thông số kỹ thuật</h2>
 
             {formData.type === "Car" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Số km đã chạy *
-                </label>
-                <input
-                  type="number"
-                  name="mileageKm"
-                  value={formData.mileageKm}
-                  onChange={handleInputChange}
-                  placeholder="15000"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Số km đã chạy *
+                    </label>
+                    <input
+                      type="number"
+                      name="mileageKm"
+                      value={formData.mileageKm}
+                      onChange={handleInputChange}
+                      placeholder="15000"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Loại xe
+                    </label>
+                    <input
+                      type="text"
+                      name="vehicleType"
+                      value={formData.vehicleType}
+                      onChange={handleInputChange}
+                      placeholder="Sedan / SUV / Hatchback..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Biển số
+                    </label>
+                    <input
+                      type="text"
+                      name="licensePlate"
+                      value={formData.licensePlate}
+                      onChange={handleInputChange}
+                      placeholder="30G-12345"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Dung tích xi lanh (cc)
+                    </label>
+                    <input
+                      type="number"
+                      name="engineDisplacementCc"
+                      value={formData.engineDisplacementCc}
+                      onChange={handleInputChange}
+                      placeholder="1500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Màu sơn
+                    </label>
+                    <input
+                      type="text"
+                      name="paintColor"
+                      value={formData.paintColor}
+                      onChange={handleInputChange}
+                      placeholder="Đỏ / Trắng / Đen..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Số máy
+                    </label>
+                    <input
+                      type="text"
+                      name="engineNumber"
+                      value={formData.engineNumber}
+                      onChange={handleInputChange}
+                      placeholder="1NZ-123456"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Số khung
+                    </label>
+                    <input
+                      type="text"
+                      name="chassisNumber"
+                      value={formData.chassisNumber}
+                      onChange={handleInputChange}
+                      placeholder="VN123456789"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Đặc điểm khác
+                  </label>
+                  <textarea
+                    name="otherFeatures"
+                    value={formData.otherFeatures}
+                    onChange={handleInputChange}
+                    placeholder="Bản cao cấp, có sunroof..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Dung lượng pin (kWh) *
-                </label>
-                <input
-                  type="number"
-                  name="batteryCapacityKWh"
-                  value={formData.batteryCapacityKWh}
-                  onChange={handleInputChange}
-                  placeholder="87.7"
-                  step="0.1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
+            {formData.type === "Battery" && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Dung lượng pin (kWh) *
+                    </label>
+                    <input
+                      type="number"
+                      name="batteryCapacityKWh"
+                      value={formData.batteryCapacityKWh}
+                      onChange={handleInputChange}
+                      placeholder="60"
+                      step="0.1"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Số chu kỳ sạc
+                    </label>
+                    <input
+                      type="number"
+                      name="chargeCycles"
+                      value={formData.chargeCycles}
+                      onChange={handleInputChange}
+                      placeholder="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <p className="text-sm text-gray-500 mt-1">Để trống nếu không biết</p>
+                  </div>
+                </div>
+              </>
+            )}
 
+            {/* Condition (chung) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Tình trạng *
@@ -474,25 +553,27 @@ const PostListingPage: React.FC = () => {
                   <option value="New">Mới</option>
                   <option value="LikeNew">Như mới</option>
                   <option value="Used">Đã qua sử dụng</option>
+                  <option value="Worn">Cũ/nhiều hao mòn</option>
                 </select>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Số chu kỳ sạc
-              </label>
-              <input
-                type="number"
-                name="chargeCycles"
-                value={formData.chargeCycles}
-                onChange={handleInputChange}
-                placeholder="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                Để trống nếu không biết
-              </p>
+              {/* BatteryCapacity cho Car (không bắt buộc) */}
+              {formData.type === "Car" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Dung lượng pin (kWh)
+                  </label>
+                  <input
+                    type="number"
+                    name="batteryCapacityKWh"
+                    value={formData.batteryCapacityKWh}
+                    onChange={handleInputChange}
+                    placeholder="(Không bắt buộc)"
+                    step="0.1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              )}
             </div>
           </div>
         );
@@ -509,7 +590,7 @@ const PostListingPage: React.FC = () => {
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                 <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600 mb-4">
-                  Kéo thả hoặc click để tải ảnh lên
+                  Kéo thả hoặc click để tải ảnh lên — <strong>cần tối thiểu 3 ảnh</strong>
                 </p>
                 <input
                   type="file"
@@ -626,7 +707,8 @@ const PostListingPage: React.FC = () => {
                 required
               >
                 <option value="meet">Gặp mặt trực tiếp</option>
-                <option value="post">Gửi qua bưu điện</option>
+                <option value="ship">Gửi vận chuyển</option>
+                <option value="consignment">Ký gửi</option>
               </select>
             </div>
 
@@ -645,10 +727,7 @@ const PostListingPage: React.FC = () => {
                 <p>
                   <strong>Giá:</strong>{" "}
                   {formData.priceListed
-                    ? new Intl.NumberFormat("vi-VN", {
-                        style: "currency",
-                        currency: "VND",
-                      }).format(Number(formData.priceListed))
+                    ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(Number(formData.priceListed))
                     : "Chưa nhập"}
                 </p>
                 <p>
@@ -660,8 +739,7 @@ const PostListingPage: React.FC = () => {
                   <strong>Địa điểm:</strong> {formData.city || "Chưa nhập"}
                 </p>
                 <p>
-                  <strong>Tình trạng:</strong>{" "}
-                  {formData.condition || "Chưa chọn"}
+                  <strong>Tình trạng:</strong> {formData.condition || "Chưa chọn"}
                 </p>
               </div>
             </div>
@@ -678,12 +756,8 @@ const PostListingPage: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Đăng tin bán xe điện
-          </h1>
-          <p className="text-gray-600">
-            Điền thông tin chi tiết để thu hút nhiều khách hàng hơn
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Đăng tin bán xe điện</h1>
+          <p className="text-gray-600">Điền thông tin chi tiết để thu hút nhiều khách hàng hơn</p>
         </div>
 
         {/* Progress Steps */}
@@ -693,20 +767,12 @@ const PostListingPage: React.FC = () => {
               <div key={step} className="flex items-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-                    step <= currentStep
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-600"
+                    step <= currentStep ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-600"
                   }`}
                 >
                   {step}
                 </div>
-                {step < 4 && (
-                  <div
-                    className={`w-12 h-1 mx-2 ${
-                      step < currentStep ? "bg-blue-600" : "bg-gray-200"
-                    }`}
-                  />
-                )}
+                {step < 4 && <div className={`w-12 h-1 mx-2 ${step < currentStep ? "bg-blue-600" : "bg-gray-200"}`} />}
               </div>
             ))}
           </div>
@@ -729,9 +795,7 @@ const PostListingPage: React.FC = () => {
                 type="button"
                 onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
                 className={`px-6 py-2 rounded-lg font-medium ${
-                  currentStep === 1
-                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  currentStep === 1 ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                 }`}
                 disabled={currentStep === 1}
               >
