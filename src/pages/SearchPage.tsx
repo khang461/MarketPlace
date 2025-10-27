@@ -36,7 +36,7 @@ const SearchPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>([]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -48,6 +48,7 @@ const SearchPage: React.FC = () => {
   });
 
   const [filters, setFilters] = useState({
+    type: searchParams.get("type") || "",
     make: searchParams.get("make") || "",
     model: searchParams.get("model") || "",
     minPrice: searchParams.get("minPrice") || "",
@@ -61,6 +62,11 @@ const SearchPage: React.FC = () => {
     sortBy: searchParams.get("sortBy") || "newest",
   });
 
+  const types = [
+    { value: "", label: "Tất cả loại" },
+    { value: "Car", label: "Ô tô điện" },
+    { value: "Battery", label: "Pin xe điện" },
+  ];
   const makes = ["Tesla", "VinFast", "Honda", "Toyota", "Hyundai", "BYD"];
   const years = [2024, 2023, 2022, 2021, 2020];
   const cities = ["Hà Nội", "HCM", "Đà Nẵng", "Cần Thơ", "Hải Phòng"];
@@ -73,8 +79,8 @@ const SearchPage: React.FC = () => {
   const sortOptions = [
     { value: "newest", label: "Mới nhất" },
     { value: "oldest", label: "Cũ nhất" },
-    { value: "priceAsc", label: "Giá thấp đến cao" },
-    { value: "priceDesc", label: "Giá cao đến thấp" },
+    { value: "price_low", label: "Giá thấp đến cao" },
+    { value: "price_high", label: "Giá cao đến thấp" },
   ];
 
   useEffect(() => {
@@ -88,6 +94,7 @@ const SearchPage: React.FC = () => {
           sortBy: filters.sortBy,
         };
 
+        if (filters.type) params.type = filters.type;
         if (filters.make) params.make = filters.make;
         if (filters.model) params.model = filters.model;
         if (filters.year) params.year = filters.year;
@@ -174,6 +181,7 @@ const SearchPage: React.FC = () => {
 
   const clearFilters = () => {
     setFilters({
+      type: "",
       make: "",
       model: "",
       minPrice: "",
@@ -241,9 +249,7 @@ const SearchPage: React.FC = () => {
 
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Filters Sidebar */}
-          <div
-            className={`lg:w-80 ${showFilters ? "block" : "hidden lg:block"}`}
-          >
+          <div className={`lg:w-80 ${showFilters ? "block" : "hidden"}`}>
             <div className="bg-white rounded-lg shadow-md p-6 sticky top-24">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">Bộ lọc tìm kiếm</h2>
@@ -256,6 +262,24 @@ const SearchPage: React.FC = () => {
               </div>
 
               <div className="space-y-4">
+                {/* Type (Loại sản phẩm) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Loại sản phẩm
+                  </label>
+                  <select
+                    value={filters.type}
+                    onChange={(e) => handleFilterChange("type", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    {types.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Model */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

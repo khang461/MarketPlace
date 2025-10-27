@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import {
   Car,
   Battery,
-  Clock,
   Star,
   ArrowRight,
   Zap,
@@ -11,7 +10,6 @@ import {
   Users,
 } from "lucide-react";
 import VehicleCard from "../components/Common/VehicleCard";
-import { mockCategories } from "../data/mockData";
 import { Vehicle } from "../types";
 import api from "../config/api";
 
@@ -45,16 +43,22 @@ const HomePage: React.FC = () => {
   const [featuredVehicles, setFeaturedVehicles] = useState<Vehicle[]>([]);
   const [latestVehicles, setLatestVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [categories, setCategories] = useState<
+    { type: string; count: number }[]
+  >([]);
+  const [conditionCategories, setConditionCategories] = useState<
+    { condition: string; count: number }[]
+  >([]);
 
-  // Fetch featured vehicles (sản phẩm nổi bật - lấy 6 sản phẩm đầu tiên)
   useEffect(() => {
     const fetchFeaturedVehicles = async () => {
       try {
         const response = await api.get("/listings", {
           params: {
             page: "1",
-            limit: "6",
+            limit: "3",
             sortBy: "newest",
+            condition: "New",
           },
         });
 
@@ -90,14 +94,13 @@ const HomePage: React.FC = () => {
     fetchFeaturedVehicles();
   }, []);
 
-  // Fetch latest vehicles (tin đăng mới nhất - lấy 6 sản phẩm mới nhất)
   useEffect(() => {
     const fetchLatestVehicles = async () => {
       try {
         const response = await api.get("/listings", {
           params: {
             page: "1",
-            limit: "6",
+            limit: "3",
             sortBy: "newest",
           },
         });
@@ -136,15 +139,93 @@ const HomePage: React.FC = () => {
     fetchLatestVehicles();
   }, []);
 
-  const getCategoryIcon = (iconName: string) => {
-    const icons = {
+  // Fetch categories từ listings
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get("/listings", {
+          params: {
+            page: "1",
+            limit: "100", // Lấy nhiều để đếm
+          },
+        });
+
+        // Đếm số lượng theo type
+        const typeCounts: Record<string, number> = {};
+        response.data.listings.forEach((listing: Listing) => {
+          typeCounts[listing.type] = (typeCounts[listing.type] || 0) + 1;
+        });
+
+        // Convert thành array
+        const categoryArray = Object.entries(typeCounts).map(
+          ([type, count]) => ({
+            type,
+            count,
+          })
+        );
+
+        setCategories(categoryArray);
+
+        // Đếm số lượng theo condition
+        const conditionCounts: Record<string, number> = {};
+        response.data.listings.forEach((listing: Listing) => {
+          conditionCounts[listing.condition] =
+            (conditionCounts[listing.condition] || 0) + 1;
+        });
+
+        // Convert thành array (chỉ lấy New và LikeNew)
+        const conditionArray = Object.entries(conditionCounts)
+          .filter(
+            ([condition]) => condition === "New" || condition === "LikeNew"
+          )
+          .map(([condition, count]) => ({
+            condition,
+            count,
+          }));
+
+        setConditionCategories(conditionArray);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  const getCategoryIcon = (type: string) => {
+    const icons: Record<string, React.ComponentType<{ className?: string }>> = {
       Car: Car,
       Battery: Battery,
-      Clock: Clock,
-      Star: Star,
+      Motor: Zap,
+      Accessory: Star,
     };
-    const IconComponent = icons[iconName as keyof typeof icons] || Car;
+    const IconComponent = icons[type] || Car;
     return <IconComponent className="w-8 h-8" />;
+  };
+
+  const getCategoryName = (type: string) => {
+    const names: Record<string, string> = {
+      Car: "Ô tô điện",
+      Battery: "Pin xe điện",
+      Motor: "Động cơ",
+      Accessory: "Phụ kiện",
+    };
+    return names[type] || type;
+  };
+
+  const getConditionIcon = (condition: string) => {
+    if (condition === "New") {
+      return <Star className="w-8 h-8" />;
+    }
+    return <Shield className="w-8 h-8" />;
+  };
+
+  const getConditionName = (condition: string) => {
+    const names: Record<string, string> = {
+      New: "Xe mới",
+      LikeNew: "Như mới",
+    };
+    return names[condition] || condition;
   };
 
   return (
@@ -243,19 +324,36 @@ const HomePage: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {mockCategories.map((category) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 center">
+            {categories.map((category) => (
               <Link
-                key={category.id}
-                to={`/search?category=${category.id}`}
+                key={category.type}
+                to={`/search?type=${category.type}`}
                 className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow group"
               >
                 <div className="text-center">
                   <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-200 transition-colors">
-                    {getCategoryIcon(category.icon)}
+                    {getCategoryIcon(category.type)}
                   </div>
                   <h3 className="text-lg font-semibold mb-2">
-                    {category.name}
+                    {getCategoryName(category.type)}
+                  </h3>
+                  <p className="text-gray-600">{category.count} sản phẩm</p>
+                </div>
+              </Link>
+            ))}
+            {conditionCategories.map((category) => (
+              <Link
+                key={category.condition}
+                to={`/search?condition=${category.condition}`}
+                className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow group"
+              >
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-green-200 transition-colors">
+                    {getConditionIcon(category.condition)}
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">
+                    {getConditionName(category.condition)}
                   </h3>
                   <p className="text-gray-600">{category.count} sản phẩm</p>
                 </div>
