@@ -1,31 +1,38 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Heart, MapPin, Calendar, Gauge, Battery } from 'lucide-react';
-import { Vehicle } from '../../types';
+import React from "react";
+import { Link } from "react-router-dom";
+import { Heart, MapPin, Calendar, Gauge, Battery } from "lucide-react";
+import { Vehicle } from "../../types";
+import { getFirstImageUrl } from "../../utils/imageHelper";
 
 interface VehicleCardProps {
   vehicle: Vehicle;
   showFavorite?: boolean;
 }
 
-const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, showFavorite = true }) => {
+const VehicleCard: React.FC<VehicleCardProps> = ({
+  vehicle,
+  showFavorite = true,
+}) => {
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
     }).format(price);
   };
 
   const formatMileage = (mileage: number) => {
-    return new Intl.NumberFormat('vi-VN').format(mileage);
+    return new Intl.NumberFormat("vi-VN").format(mileage);
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden group">
+    <Link
+      to={`/vehicle/${vehicle.id}`}
+      className="block bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden group"
+    >
       {/* Image */}
       <div className="relative">
         <img
-          src={vehicle.images[0]}
+          src={getFirstImageUrl(vehicle.images)}
           alt={vehicle.title}
           className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
         />
@@ -35,7 +42,14 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, showFavorite = true 
           </div>
         )}
         {showFavorite && (
-          <button className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition-colors">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // Handle favorite logic here
+            }}
+            className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition-colors z-10"
+          >
             <Heart className="w-4 h-4 text-gray-600 hover:text-red-500" />
           </button>
         )}
@@ -46,11 +60,9 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, showFavorite = true 
 
       {/* Content */}
       <div className="p-4">
-        <Link to={`/vehicle/${vehicle.id}`}>
-          <h3 className="font-semibold text-lg text-gray-900 hover:text-blue-600 transition-colors line-clamp-2 mb-2">
-            {vehicle.title}
-          </h3>
-        </Link>
+        <h3 className="font-semibold text-lg text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 mb-2">
+          {vehicle.title}
+        </h3>
 
         <p className="text-2xl font-bold text-blue-600 mb-3">
           {formatPrice(vehicle.price)}
@@ -63,7 +75,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, showFavorite = true 
               <Calendar className="w-4 h-4" />
               <span>Năm {vehicle.year}</span>
             </div>
-            {vehicle.category === 'car' && (
+            {vehicle.category === "car" && (
               <div className="flex items-center space-x-1">
                 <Gauge className="w-4 h-4" />
                 <span>{formatMileage(vehicle.mileage)} km</span>
@@ -74,7 +86,9 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, showFavorite = true 
           {vehicle.batteryCapacity && (
             <div className="flex items-center space-x-1">
               <Battery className="w-4 h-4" />
-              <span>Pin {vehicle.batteryCapacity}kWh - {vehicle.batteryCondition}</span>
+              <span>
+                Pin {vehicle.batteryCapacity}kWh - {vehicle.batteryCondition}
+              </span>
             </div>
           )}
 
@@ -93,7 +107,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, showFavorite = true 
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 };
 

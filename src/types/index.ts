@@ -9,6 +9,11 @@ export interface User {
   totalTransactions: number;
 }
 
+export interface VehicleImage {
+  url: string;
+  kind?: string;
+}
+
 export interface Vehicle {
   id: string;
   title: string;
@@ -17,7 +22,7 @@ export interface Vehicle {
   year: number;
   mileage: number;
   price: number;
-  images: string[];
+  images: (string | VehicleImage)[];
   description: string;
   sellerId: string;
   sellerName: string;
