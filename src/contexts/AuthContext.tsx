@@ -13,6 +13,7 @@ interface User {
   email: string;
   avatar?: string;
   rating?: number;
+  role?: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
