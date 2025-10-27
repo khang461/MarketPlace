@@ -4,7 +4,6 @@ import { MessageCircle, Search, Circle } from "lucide-react";
 import api from "../../config/api";
 import { Chat } from "../../types/chat";
 import { getImageUrl } from "../../utils/imageHelper";
-import { useAuth } from "../../contexts/AuthContext";
 
 const ChatTab: React.FC = () => {
   const [chats, setChats] = useState<Chat[]>([]);
@@ -12,7 +11,6 @@ const ChatTab: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   useEffect(() => {
     fetchChats();
@@ -67,10 +65,9 @@ const ChatTab: React.FC = () => {
   };
 
   const filteredChats = chats.filter((chat) => {
-    // Xác định người chat trước khi filter
-    const otherUser =
-      chat.buyerId?._id === user?.id ? chat.sellerId : chat.buyerId;
-    const listing = chat.listingId;
+    // API mới trả về otherUser và listing trực tiếp
+    const otherUser = chat.otherUser;
+    const listing = chat.listing || chat.listingId;
     const searchLower = searchQuery.toLowerCase();
 
     return (
@@ -170,11 +167,15 @@ const ChatTab: React.FC = () => {
           </div>
         ) : (
           filteredChats.map((chat) => {
-            // Xác định người chat (không phải mình)
-            const otherUser =
-              chat.buyerId._id === user?.id ? chat.sellerId : chat.buyerId;
-            const listing = chat.listingId;
+            // API mới trả về otherUser và listing trực tiếp
+            const otherUser = chat.otherUser;
+            const listing = chat.listing || chat.listingId;
             const listingImage = listing?.photos?.[0];
+
+            // Skip nếu không có dữ liệu cơ bản
+            if (!otherUser || !listing) {
+              return null;
+            }
 
             return (
               <div
@@ -209,7 +210,7 @@ const ChatTab: React.FC = () => {
                       <h3 className="text-base font-semibold text-gray-900 truncate">
                         {otherUser?.fullName || "Người dùng"}
                       </h3>
-                      {chat.lastMessage && (
+                      {chat.lastMessage?.timestamp && (
                         <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
                           {formatTime(chat.lastMessage.timestamp.toString())}
                         </span>
@@ -231,11 +232,22 @@ const ChatTab: React.FC = () => {
                     </div>
 
                     {/* Last Message */}
-                    {chat.lastMessage && (
-                      <p className="text-sm text-gray-600 truncate">
-                        {truncateMessage(chat.lastMessage.content)}
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-gray-600 truncate flex-1">
+                        {chat.lastMessage?.content ? (
+                          truncateMessage(chat.lastMessage.content)
+                        ) : (
+                          <span className="italic text-gray-400">
+                            Chưa có tin nhắn
+                          </span>
+                        )}
                       </p>
-                    )}
+                      {(chat.unreadCount || 0) > 0 && (
+                        <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">
+                          {chat.unreadCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -246,5 +258,4 @@ const ChatTab: React.FC = () => {
     </div>
   );
 };
-
 export default ChatTab;

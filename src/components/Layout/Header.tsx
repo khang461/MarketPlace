@@ -14,6 +14,7 @@ import {
 import Swal from "sweetalert2";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../config/api";
+import NotificationBellSimple from "../Common/NotificationBellSimple";
 
 interface SearchSuggestion {
   query: string;
@@ -381,6 +382,9 @@ const Header: React.FC = () => {
               <Plus className="w-4 h-4" />
               <span>Đăng tin</span>
             </Link>
+
+            {/* Notification Bell - Simple version without dropdown */}
+            {isAuthenticated && user && <NotificationBellSimple />}
 
             {/* User Menu */}
             {isAuthenticated ? (
