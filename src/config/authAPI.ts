@@ -7,6 +7,16 @@ export const authAPI = {
     phone: string;
     email: string;
     password: string;
+    gender?: string;
+    dateOfBirth?: string;
+    avatar?: string;
+    address?: {
+      fullAddress?: string;
+      ward?: string;
+      district?: string;
+      city?: string;
+      province?: string;
+    };
     termsAgreed: boolean;
   }) => {
     const response = await api.post("/users/signup", data);

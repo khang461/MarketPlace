@@ -17,9 +17,12 @@ export interface ChatListing {
 }
 
 export interface LastMessage {
-  content: string;
-  senderId: string;
-  timestamp: Date;
+  content?: string;
+  senderId?: {
+    _id: string;
+    fullName: string;
+  } | string;
+  timestamp?: Date | string;
 }
 
 export interface Chat {
@@ -32,6 +35,10 @@ export interface Chat {
   createdAt: string;
   updatedAt: string;
   otherUser?: ChatUser;
+  listing?: ChatListing; // API mới trả về listing trực tiếp
+  chatType?: string;
+  unreadCount?: number;
+  lastMessageAt?: string;
 }
 
 export interface MessageSender {

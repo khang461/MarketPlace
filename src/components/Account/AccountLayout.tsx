@@ -16,7 +16,7 @@ interface AccountLayoutProps {
 const tabs: Tab[] = [
   { id: "profile", name: "Hồ sơ", icon: User },
   { id: "listings", name: "Tin đăng", icon: Package },
-  { id: "chat", name: "Tin nhắn", icon: MessageCircle },
+  // { id: "chat", name: "Tin nhắn", icon: MessageCircle },
   { id: "favorites", name: "Yêu thích", icon: Heart },
   { id: "transactions", name: "Giao dịch", icon: Clock },
 ];
