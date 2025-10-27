@@ -12,6 +12,7 @@ import SignInPage from "./pages/SignInPage";
 import SignUpPage from "./pages/SignUpPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import ContractPage from "./pages/Contract/contract";
 import ScrollToTop from "./components/ScrollToTop/scrollToTop";
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
             <Route path="/signin" element={<SignInPage />} />
             <Route path="/signup" element={<SignUpPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/contract" element={<ContractPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>
