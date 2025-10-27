@@ -4,7 +4,6 @@ import {
   Heart,
   Share2,
   MapPin,
-  Phone,
   MessageCircle,
   ChevronLeft,
   ChevronRight,
@@ -164,6 +163,152 @@ const VehicleDetailPage: React.FC = () => {
           axiosError.response?.data?.error || "Không thể tạo cuộc trò chuyện",
         confirmButtonColor: "#2563eb",
       });
+    }
+  };
+
+  const handleDeposit = async () => {
+    if (!isAuthenticated) {
+      Swal.fire({
+        icon: "warning",
+        title: "Cần đăng nhập",
+        text: "Vui lòng đăng nhập để đặt cọc",
+        confirmButtonColor: "#2563eb",
+        showCancelButton: true,
+        confirmButtonText: "Đăng nhập",
+        cancelButtonText: "Hủy",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          navigate("/signin");
+        }
+      });
+      return;
+    }
+
+    // Yêu cầu nhập số tiền đặt cọc
+    const { value: depositAmount } = await Swal.fire({
+      title: "Đặt cọc",
+      html: `
+        <p class="text-left mb-4">Giá xe: <strong>${formatPrice(listing.priceListed)}</strong></p>
+        <label class="block text-left mb-2">Số tiền đặt cọc (VND):</label>
+        <input 
+          id="depositAmount" 
+          type="number" 
+          class="swal2-input" 
+          placeholder="Nhập số tiền" 
+          min="${Math.round(listing.priceListed * 0.1)}" 
+          step="100000"
+        />
+        <p class="text-left mt-2 text-sm text-gray-500">Số tiền tối thiểu: ${formatPrice(Math.round(listing.priceListed * 0.1))} (10% giá xe)</p>
+      `,
+      confirmButtonText: "Xác nhận",
+      cancelButtonText: "Hủy",
+      showCancelButton: true,
+      preConfirm: () => {
+        const amount = (document.getElementById('depositAmount') as HTMLInputElement).value;
+        const minAmount = Math.round(listing.priceListed * 0.1); // 10% giá xe
+        if (!amount || parseInt(amount) < minAmount) {
+          Swal.showValidationMessage(`Số tiền phải lớn hơn hoặc bằng ${formatPrice(minAmount)} (10% giá xe)`);
+          return false;
+        }
+        return parseInt(amount);
+      }
+    });
+
+    if (!depositAmount) return;
+
+    // Gọi API đặt cọc
+    try {
+      const response = await api.post("/deposits", {
+        listingId: id,
+        depositAmount: depositAmount,
+      });
+
+      if (response.data.success) {
+        Swal.fire({
+          icon: "success",
+          title: "Đặt cọc thành công!",
+          text: "Yêu cầu đặt cọc của bạn đã được gửi đến người bán, xin hãy đợi phản hồi từ Gmail của chúng tôi  ",
+          confirmButtonColor: "#2563eb",
+        });
+      } else if (response.data.vnpayUrl) {
+        // Số dư không đủ, BE trả về URL VNPay để nạp tiền
+        Swal.fire({
+          icon: "warning",
+          title: "Số dư không đủ",
+          html: `
+            <p>Bạn cần <strong>${formatPrice(response.data.requiredAmount || 0)}</strong> để đặt cọc</p>
+            <p>Số dư hiện tại: <strong>${formatPrice(response.data.currentBalance || 0)}</strong></p>
+            <p class="mt-3">Bạn có muốn nạp tiền vào ví để đặt cọc không?</p>
+          `,
+          showCancelButton: true,
+          confirmButtonText: "Nạp tiền",
+          cancelButtonText: "Hủy",
+          confirmButtonColor: "#2563eb",
+        }).then((result) => {
+          if (result.isConfirmed) {
+            // Redirect to VNPay để nạp tiền
+            window.location.href = response.data.vnpayUrl || '';
+          }
+        });
+      } else {
+        // Lỗi khác
+        Swal.fire({
+          icon: "error",
+          title: "Lỗi",
+          text: response.data.message || "Không thể tạo yêu cầu đặt cọc",
+          confirmButtonColor: "#2563eb",
+        });
+      }
+    } catch (error: unknown) {
+      console.error("Error creating deposit:", error);
+      const axiosError = error as {
+        response?: { data?: { message?: string; error?: string; vnpayUrl?: string; requiredAmount?: number; currentBalance?: number } };
+      };
+
+      // Kiểm tra nếu có vnpayUrl trong response lỗi
+      if (axiosError.response?.data?.vnpayUrl) {
+        Swal.fire({
+          icon: "warning",
+          title: "Số dư không đủ",
+          html: `
+            <p>Bạn cần <strong>${formatPrice(axiosError.response.data.requiredAmount || 0)}</strong> để đặt cọc</p>
+            <p>Số dư hiện tại: <strong>${formatPrice(axiosError.response.data.currentBalance || 0)}</strong></p>
+            <p class="mt-3">Bạn có muốn nạp tiền vào ví để đặt cọc không?</p>
+          `,
+          showCancelButton: true,
+          confirmButtonText: "Nạp tiền",
+          cancelButtonText: "Hủy",
+          confirmButtonColor: "#2563eb",
+        }).then((result) => {
+          if (result.isConfirmed) {
+            // Redirect to VNPay để nạp tiền
+            window.location.href = axiosError.response?.data?.vnpayUrl || "";
+          }
+        });
+      } else if (axiosError.response?.data?.error?.includes("freezeAmount is not a function")) {
+        // Lỗi backend - walletService không có freezeAmount function
+        Swal.fire({
+          icon: "error",
+          title: "Lỗi hệ thống",
+          html: `
+            <p>Xin lỗi, hệ thống đang gặp lỗi kỹ thuật.</p>
+            <p class="text-sm text-gray-500 mt-2">Vui lòng thử lại sau hoặc liên hệ bộ phận hỗ trợ.</p>
+          `,
+          confirmButtonColor: "#2563eb",
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Lỗi",
+          html: `
+            <p>${axiosError.response?.data?.message || axiosError.response?.data?.error || "Không thể tạo yêu cầu đặt cọc"}</p>
+            ${axiosError.response?.data?.error && (
+              `<p class="text-xs text-gray-500 mt-2">${axiosError.response.data.error}</p>`
+            )}
+          `,
+          confirmButtonColor: "#2563eb",
+        });
+      }
     }
   };
 
@@ -385,8 +530,11 @@ const VehicleDetailPage: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-                  Liên hệ mua
+                <button 
+                  onClick={handleDeposit}
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  Đặt cọc
                 </button>
                 <button className="w-full border border-blue-600 text-blue-600 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2">
                   <Heart className="w-4 h-4" />

@@ -14,6 +14,8 @@ import SignUpPage from "./pages/SignUpPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ContractPage from "./pages/Contract/contract";
+import WalletPage from "./pages/WalletPage";
+import NotificationPage from "./pages/NotificationPage";
 import ScrollToTop from "./components/ScrollToTop/scrollToTop";
 
 function App() {
@@ -35,6 +37,8 @@ function App() {
                   <Route path="/vehicle/:id" element={<VehicleDetailPage />} />
                   <Route path="/post-listing" element={<PostListingPage />} />
                   <Route path="/account" element={<AccountPage />} />
+                  <Route path="/wallet" element={<WalletPage />} />
+                  <Route path="/notifications" element={<NotificationPage />} />
                   <Route path="/support" element={<SupportPage />} />
                   <Route path="/signin" element={<SignInPage />} />
                   <Route path="/signup" element={<SignUpPage />} />

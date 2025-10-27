@@ -8,6 +8,8 @@ import {
   MessageSquare,
   Plus,
   LogOut,
+  Wallet,
+  FileText,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { useAuth } from "../../contexts/AuthContext";
@@ -40,6 +42,7 @@ const Header: React.FC = () => {
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [popularSearches, setPopularSearches] = useState<PopularSearch[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
   const searchRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -101,6 +104,25 @@ const Header: React.FC = () => {
 
     fetchPopularSearches();
   }, []);
+
+  // Fetch unread notifications count
+  useEffect(() => {
+    const fetchUnreadNotifications = async () => {
+      if (!isAuthenticated) return;
+
+      try {
+        const response = await api.get("/notifications/unread-count");
+        if (response.data.success) {
+          setUnreadNotifications(response.data.count || 0);
+        }
+      } catch (error) {
+        console.error("Error fetching unread notifications:", error);
+        // Mock data for demo
+      }
+    };
+
+    fetchUnreadNotifications();
+  }, [isAuthenticated]);
 
   // Fetch suggestions when user types
   useEffect(() => {
@@ -393,6 +415,25 @@ const Header: React.FC = () => {
                   >
                     Tài khoản
                   </Link>
+                  <Link
+                    to="/wallet"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <Wallet className="w-4 h-4" />
+                    <span>Ví của tôi</span>
+                  </Link>
+                  <Link
+                    to="/notifications"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2 relative"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Yêu cầu đặt cọc</span>
+                    {unreadNotifications > 0 && (
+                      <span className="ml-auto bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                      </span>
+                    )}
+                  </Link>
                   <button
                     onClick={() => {
                       logout();
@@ -418,6 +459,7 @@ const Header: React.FC = () => {
                 <User className="w-6 h-6" />
               </Link>
             )}
+
 
             <Link to="/support" className="text-gray-700 hover:text-blue-600">
               <MessageSquare className="w-6 h-6" />
@@ -479,6 +521,27 @@ const Header: React.FC = () => {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Tài khoản
+                  </Link>
+                  <Link
+                    to="/wallet"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg flex items-center space-x-2"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Wallet className="w-4 h-4" />
+                    <span>Ví của tôi</span>
+                  </Link>
+                  <Link
+                    to="/notifications"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg flex items-center space-x-2 relative"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Yêu cầu đặt cọc</span>
+                    {unreadNotifications > 0 && (
+                      <span className="ml-auto bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                      </span>
+                    )}
                   </Link>
                   <Link
                     to="/support"
