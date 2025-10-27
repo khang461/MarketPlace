@@ -4,7 +4,6 @@ import {
   Heart,
   Share2,
   MapPin,
-  Phone,
   MessageCircle,
   ChevronLeft,
   ChevronRight,

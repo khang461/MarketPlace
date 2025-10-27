@@ -113,6 +113,7 @@ const SearchPage: React.FC = () => {
         const response = await api.get("/listings", { params });
 
         console.log("Listings response:", response.data);
+        console.log("Params used:", listings);
 
         setPagination(
           response.data.pagination || {
