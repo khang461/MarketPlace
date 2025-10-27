@@ -98,8 +98,8 @@ const WalletPage: React.FC = () => {
       return;
     }
 
-    if (depositAmount > 100000000) {
-      showMessage('error', 'Số tiền nạp tối đa là 100,000,000 VNĐ');
+    if (depositAmount > 1000000000) {
+      showMessage('error', 'Số tiền nạp tối đa là 1,000,000,000 VNĐ');
       return;
     }
 

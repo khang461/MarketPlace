@@ -428,7 +428,7 @@ const Header: React.FC = () => {
                     <span>Ví của tôi</span>
                   </Link>
                   <Link
-                    to="/notifications"
+                    to="/notifications-deposit"
                     className="block px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2 relative"
                   >
                     <FileText className="w-4 h-4" />
@@ -536,7 +536,7 @@ const Header: React.FC = () => {
                     <span>Ví của tôi</span>
                   </Link>
                   <Link
-                    to="/notifications"
+                    to="/notifications-deposit"
                     className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg flex items-center space-x-2 relative"
                     onClick={() => setIsMenuOpen(false)}
                   >

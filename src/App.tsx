@@ -17,7 +17,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ContractPage from "./pages/Contract/contract";
 import WalletPage from "./pages/WalletPage";
-import NotificationPage from "./pages/NotificationPage";
+import NotificationDepositPage from "./pages/NotificationDepositPage";
 import ScrollToTop from "./components/ScrollToTop/scrollToTop";
 import "./utils/websocketDebug"; // Load debug tools
 
@@ -41,7 +41,7 @@ function App() {
                   <Route path="/post-listing" element={<PostListingPage />} />
                   <Route path="/account" element={<AccountPage />} />
                   <Route path="/wallet" element={<WalletPage />} />
-                  <Route path="/notifications" element={<NotificationPage />} />
+                  <Route path="/notifications-deposit" element={<NotificationDepositPage />} />
                   <Route
                     path="/notifications"
                     element={<NotificationsPage />}
