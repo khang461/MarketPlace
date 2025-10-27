@@ -14,6 +14,19 @@ export interface UserData {
   role?: string;
   rating?: number;
   status?: string;
+  gender?: string;
+  dateOfBirth?: string;
+  address?: {
+    _id?: string;
+    fullAddress?: string;
+    ward?: string;
+    district?: string;
+    city?: string;
+    province?: string;
+    isActive?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+  };
   stats?: {
     soldCount?: number;
     buyCount?: number;
@@ -29,12 +42,12 @@ export interface UserData {
 
 // Media từ Cloudinary (giữ tương thích chỗ FE đang dùng `url`, `kind`)
 export interface Media {
-  url: string;                 // Cloudinary secure_url
+  url: string; // Cloudinary secure_url
   kind: "photo" | "doc";
-  publicId?: string;           // Cloudinary public_id (để xoá/transform)
+  publicId?: string; // Cloudinary public_id (để xoá/transform)
   width?: number;
   height?: number;
-  format?: string;             // ví dụ: jpg, png, webp
+  format?: string; // ví dụ: jpg, png, webp
 }
 
 export interface Location {
@@ -59,7 +72,7 @@ export type ConditionType = "New" | "LikeNew" | "Used" | "Worn";
 /** Base chung cho cả Car/Battery */
 interface BaseListing {
   _id: string;
-  sellerId?: string;                 // có thể populate tuỳ API
+  sellerId?: string; // có thể populate tuỳ API
   type: "Car" | "Battery";
 
   make?: string;
@@ -91,13 +104,13 @@ interface BaseListing {
 /** Chỉ dành cho Car (theo mẫu hợp đồng) */
 export interface CarListing extends BaseListing {
   type: "Car";
-  licensePlate?: string;            // Biển số
-  engineDisplacementCc?: number;    // Dung tích xi lanh (cc)
-  vehicleType?: string;             // Loại xe: Sedan/SUV/Truck...
-  paintColor?: string;              // Màu sơn
-  engineNumber?: string;            // Số máy
-  chassisNumber?: string;           // Số khung
-  otherFeatures?: string;           // Đặc điểm khác
+  licensePlate?: string; // Biển số
+  engineDisplacementCc?: number; // Dung tích xi lanh (cc)
+  vehicleType?: string; // Loại xe: Sedan/SUV/Truck...
+  paintColor?: string; // Màu sơn
+  engineNumber?: string; // Số máy
+  chassisNumber?: string; // Số khung
+  otherFeatures?: string; // Đặc điểm khác
   // Battery-only fields sẽ KHÔNG xuất hiện ở đây
   batteryCapacityKWh?: never;
   chargeCycles?: never;
@@ -125,19 +138,20 @@ export type Listing = CarListing | BatteryListing;
  * Type Guards (tiện khi render điều kiện)
  * ========= */
 export const isCarListing = (l: Listing): l is CarListing => l?.type === "Car";
-export const isBatteryListing = (l: Listing): l is BatteryListing => l?.type === "Battery";
+export const isBatteryListing = (l: Listing): l is BatteryListing =>
+  l?.type === "Battery";
 
 /* =========
  * (Giữ nguyên) Transaction
  * ========= */
 export interface Transaction {
   id: string;
-  vehicleId: string;           // Listing._id
-  vehicleTitle: string;        // có thể build từ make/model/year
+  vehicleId: string; // Listing._id
+  vehicleTitle: string; // có thể build từ make/model/year
   buyerId?: string;
   sellerId?: string;
   amount: number;
   status: "completed" | "pending" | "cancelled";
   paymentMethod: string;
-  date: string;                // ISO string
+  date: string; // ISO string
 }
