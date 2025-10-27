@@ -12,6 +12,7 @@ import {
 import { UserData } from "../../types/account";
 import api from "../../config/api";
 import Swal from "sweetalert2";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface ProfileTabProps {
   userData: UserData | null;
@@ -38,6 +39,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ userData, onUpdate }) => {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [showUrlInput, setShowUrlInput] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { login } = useAuth();
 
   const handleEditClick = () => {
     setIsEditing(true);
@@ -222,6 +224,19 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ userData, onUpdate }) => {
       });
 
       onUpdate(response.data);
+
+      // Cập nhật AuthContext với thông tin mới
+      const updatedUser = {
+        id: response.data._id || response.data.id || "",
+        name: response.data.fullName || response.data.name || "",
+        email: response.data.email || "",
+        avatar: avatarUrl,
+        rating: response.data.rating || 0,
+      };
+
+      console.log("Updating AuthContext with:", updatedUser);
+      login(updatedUser);
+
       setIsEditing(false);
       setSelectedFile(null);
       setPreviewUrl("");

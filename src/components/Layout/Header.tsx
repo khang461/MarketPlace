@@ -366,7 +366,8 @@ const Header: React.FC = () => {
                 <div className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 cursor-pointer">
                   {user?.avatar ? (
                     <img
-                      src={user.avatar}
+                      key={user.avatar}
+                      src={`${user.avatar}?t=${Date.now()}`}
                       alt={user.name}
                       className="w-8 h-8 rounded-full object-cover"
                     />
