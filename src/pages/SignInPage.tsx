@@ -52,7 +52,18 @@ const SignInPage: React.FC = () => {
         password,
       });
 
-      console.log("Login response:", response);
+      // Check role - không cho phép admin đăng nhập
+      const userRole = response.user?.role || response.role || "USER";
+      if (userRole.toLowerCase() === "admin") {
+        Swal.fire({
+          icon: "error",
+          title: "Truy cập bị từ chối",
+          text: "Tài khoản Admin không được phép đăng nhập vào hệ thống này",
+          confirmButtonColor: "#2563eb",
+        });
+        setIsLoading(false);
+        return;
+      }
 
       // Lưu user ID (backend trả về user._id)
       const userId = response.user?._id || response._id || response.id;
@@ -78,6 +89,7 @@ const SignInPage: React.FC = () => {
           response.user?.fullName || response.fullName || email.split("@")[0],
         email: response.user?.email || response.email || email,
         avatar: response.user?.avatar || response.avatar || "",
+        role: response.user?.role || response.role || "USER",
       });
 
       Swal.fire({
@@ -89,7 +101,10 @@ const SignInPage: React.FC = () => {
         showConfirmButton: false,
       });
 
-      setTimeout(() => navigate("/"), 1500);
+      // Redirect - chỉ USER được phép đăng nhập
+      const redirectPath = "/";
+
+      setTimeout(() => navigate(redirectPath), 1500);
     } catch (error: unknown) {
       console.error("Login error:", error);
 
