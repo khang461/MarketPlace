@@ -69,7 +69,7 @@ if (typeof document !== 'undefined') {
 interface Notification {
   _id: string;
   userId: string;
-  type: 'deposit' | 'deposit_confirmation' | 'contract' | 'transaction_complete';
+  type: 'deposit' | 'deposit_confirmation' | 'contract' | 'transaction_complete'| 'appointment_created' | 'appointment_rejected';
   title: string;
   message: string;
   depositId?: string;
@@ -86,6 +86,7 @@ interface Notification {
     appointmentId?: string;
     staffId?: string;
     staffName?: string;
+    depositRequestId?: string;
   };
   createdAt: string;
   isAccepted?: boolean; // Thêm field để track trạng thái đã chấp nhận
@@ -142,6 +143,10 @@ const NotificationDepositPage: React.FC = () => {
         return '📄';
       case 'transaction_complete':
         return '✅';
+      case 'appointment_created':
+        return '📅';
+      case 'appointment_rejected':
+        return '❌';
       default:
         return '🔔';
     }
@@ -252,57 +257,210 @@ const NotificationDepositPage: React.FC = () => {
     }
   };
 
+  const handleAcceptAppointment = async (e: React.MouseEvent, notification: Notification) => {
+    e.stopPropagation(); // Ngăn chặn event bubble
+    
+    if (!notification.metadata?.appointmentId) {
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi!",
+        text: "Không tìm thấy thông tin lịch hẹn.",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+
+    try {
+      // Gọi API để xác nhận lịch hẹn
+      const response = await api.post(`/appointments/${notification.metadata.appointmentId}/confirm`);
+      
+      if (response.data.success) {
+        // Xóa notification sau khi chấp nhận
+        setNotifications(prev => prev.filter(n => n._id !== notification._id));
+        
+        Swal.fire({
+          icon: "success",
+          title: "Thành công!",
+          text: "Đã chấp nhận lịch hẹn.",
+          confirmButtonColor: "#2563eb",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Lỗi!",
+          text: response.data.message || "Có lỗi xảy ra khi chấp nhận lịch hẹn.",
+          confirmButtonColor: "#2563eb",
+        });
+      }
+    } catch (error) {
+      console.error('Error accepting appointment:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi hệ thống!",
+        text: axiosError.response?.data?.message || "Không thể chấp nhận lịch hẹn. Vui lòng thử lại sau.",
+        confirmButtonColor: "#2563eb",
+      });
+    }
+  };
+
+  const handleRejectAppointment = async (e: React.MouseEvent, notification: Notification) => {
+    e.stopPropagation(); // Ngăn chặn event bubble
+    
+    if (!notification.metadata?.appointmentId) {
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi!",
+        text: "Không tìm thấy thông tin lịch hẹn.",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+  
+    // Hiển thị dialog để người dùng nhập lý do và chọn ngày rảnh
+    const { value: formData } = await Swal.fire({
+      title: "Từ chối lịch hẹn",
+      width: '520px',
+      html: `
+        <div class="text-left" style="max-width: 100%; overflow: hidden;">
+          <div style="margin-bottom: 24px;">
+            <label class="block text-sm font-medium text-gray-700 mb-3">Lý do từ chối và ngày rảnh của bạn:</label>
+            <textarea 
+              id="rejectionReason" 
+              style="width: 100%; margin: 0; padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; font-family: inherit; box-sizing: border-box; resize: none; min-height: 120px; line-height: 1.5;"
+              placeholder="Nêu lý do bạn từ chối và bạn có thể chọn những ngày mà bạn rảnh để cho người bán biết"
+              rows="5"
+            ></textarea>
+          </div>
+          
+          <div class="text-sm text-gray-500">
+            <p>💡 <strong>Gợi ý:</strong> Hãy đề xuất các ngày bạn rảnh, ví dụ:</p>
+            <ul class="list-disc list-inside mt-1 text-xs">
+              <li>Thứ 2 - Thứ 6: Buổi sáng 9h - 11h</li>
+              <li>Cuối tuần: Tất cả giờ trong ngày</li>
+            </ul>
+          </div>
+        </div>
+      `,
+      confirmButtonText: "Gửi",
+      cancelButtonText: "Hủy",
+      showCancelButton: true,
+      confirmButtonColor: "#dc3545",
+      cancelButtonColor: "#6b7280",
+      customClass: {
+        popup: 'swal2-popup-modern',
+        confirmButton: 'swal2-confirm-modern',
+        cancelButton: 'swal2-cancel-modern'
+      },
+      preConfirm: () => {
+        const reason = (document.getElementById('rejectionReason') as HTMLTextAreaElement).value;
+        return {
+          reason: reason || "Không nêu rõ lý do"
+        };
+      }
+    });
+  
+    // Nếu user hủy dialog
+    if (!formData) {
+      return;
+    }
+
+    try {
+      // Gọi API để từ chối lịch hẹn
+      const response = await api.post(`/appointments/${notification.metadata.appointmentId}/reject`, formData);
+      
+      if (response.data.success) {
+        // Xóa notification sau khi từ chối
+        setNotifications(prev => prev.filter(n => n._id !== notification._id));
+        
+        Swal.fire({
+          icon: "success",
+          title: "Thành công!",
+          text: "Đã từ chối lịch hẹn. Người bán sẽ nhận được thông báo và có thể tạo lịch hẹn mới phù hợp hơn.",
+          confirmButtonColor: "#2563eb",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Lỗi!",
+          text: response.data.message || "Có lỗi xảy ra khi từ chối lịch hẹn.",
+          confirmButtonColor: "#2563eb",
+        });
+      }
+    } catch (error) {
+      console.error('Error rejecting appointment:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi hệ thống!",
+        text: axiosError.response?.data?.message || "Không thể từ chối lịch hẹn. Vui lòng thử lại sau.",
+        confirmButtonColor: "#2563eb",
+      });
+    }
+  };
   const handleCreateAppointment = async (e: React.MouseEvent, notification: Notification) => {
     e.stopPropagation(); // Ngăn chặn event bubble
-    if (!notification.depositId) return;
+    
+    // Lấy depositId từ notification metadata hoặc trực tiếp từ notification
+    const depositRequestId = notification.depositId || notification.metadata?.depositRequestId;
+    
+    if (!depositRequestId) {
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi!",
+        text: "Không tìm thấy thông tin yêu cầu đặt cọc.",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
 
     const { value: formData } = await Swal.fire({
       title: "Tạo lịch hẹn",
       width: '520px',
       html: `
         <div class="text-left" style="max-width: 100%; overflow: hidden;">
-          <div style="margin-bottom: 20px;">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Ngày hẹn:</label>
+          <div style="margin-bottom: 24px;">
+            <label class="block text-sm font-medium text-gray-700 mb-3">Ngày hẹn:</label>
             <input 
               id="appointmentDate" 
               type="date" 
-              class="swal2-input" 
-              style="width: 100%; margin-bottom: 0; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;"
+              style="width: 100%; margin: 0; padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; font-family: inherit; box-sizing: border-box; height: 48px;"
               required
             />
           </div>
           
-          <div style="margin-bottom: 20px;">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Giờ hẹn:</label>
+          <div style="margin-bottom: 24px;">
+            <label class="block text-sm font-medium text-gray-700 mb-3">Giờ hẹn:</label>
             <input 
               id="appointmentTime" 
               type="time" 
-              class="swal2-input" 
-              style="width: 100%; margin-bottom: 0; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;"
+              style="width: 100%; margin: 0; padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; font-family: inherit; box-sizing: border-box; height: 48px;"
               required
             />
           </div>
           
-          <div style="margin-bottom: 20px;">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Địa điểm:</label>
+          <div style="margin-bottom: 24px;">
+            <label class="block text-sm font-medium text-gray-700 mb-3">Địa điểm:</label>
             <input 
               id="location" 
               type="text" 
-              class="swal2-input" 
-              style="width: 100%; margin-bottom: 0; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;"
+              style="width: 100%; margin: 0; padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; font-family: inherit; box-sizing: border-box; height: 48px;"
               placeholder="Nhập địa điểm hẹn"
               required
             />
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Ghi chú:</label>
+            <label class="block text-sm font-medium text-gray-700 mb-3">Ghi chú:</label>
             <textarea 
               id="notes" 
-              class="swal2-input" 
-              style="width: 100%; margin-bottom: 0; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; resize: none; min-height: 80px;"
+              style="width: 100%; margin: 0; padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; font-family: inherit; box-sizing: border-box; resize: none; min-height: 100px; line-height: 1.5;"
               placeholder="Nhập ghi chú (tùy chọn)"
-              rows="3"
+              rows="4"
             ></textarea>
           </div>
         </div>
@@ -332,7 +490,7 @@ const NotificationDepositPage: React.FC = () => {
         const scheduledDateTime = new Date(`${appointmentDate}T${appointmentTime}:00`).toISOString();
 
         return {
-          depositRequestId: notification.depositId,
+          depositRequestId: depositRequestId,
           scheduledDate: scheduledDateTime,
           location: location,
           notes: notes || ""
@@ -514,6 +672,36 @@ const NotificationDepositPage: React.FC = () => {
                             </button>
                           </>
                         )}
+                      </div>
+                    )}
+
+                    {/* Action buttons for contract notifications */}
+                    {notification.type === 'appointment_created' && (
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={(e) => handleAcceptAppointment(e, notification)}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                        >
+                          Chấp nhận
+                        </button>
+                        <button
+                          onClick={(e) => handleRejectAppointment(e, notification)}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                        >
+                          Từ chối
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Action button for appointment_rejected notifications */}
+                    {notification.type === 'appointment_rejected' && (
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={(e) => handleCreateAppointment(e, notification)}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                        >
+                          Đặt lịch
+                        </button>
                       </div>
                     )}
                   </div>

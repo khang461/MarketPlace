@@ -18,6 +18,10 @@ import NotFoundPage from "./pages/NotFoundPage";
 import ContractPage from "./pages/Contract/contract";
 import WalletPage from "./pages/WalletPage";
 import NotificationDepositPage from "./pages/NotificationDepositPage";
+import StaffDashboard from "./pages/Staff/StaffDashboard";
+import StaffAppointmentPage from "./pages/Staff/StaffAppointmentPage";
+import ProtectedRoute from "./components/Common/ProtectedRoute";
+import StaffRedirect from "./components/Common/StaffRedirect";
 import ScrollToTop from "./components/ScrollToTop/scrollToTop";
 import "./utils/websocketDebug"; // Load debug tools
 
@@ -28,10 +32,24 @@ function App() {
       <ChatNotificationListener />
       <Routes>
         <Route path="/chat/:chatId" element={<ChatDetailPage />} />
+        
+        {/* Staff Routes - Protected */}
+        <Route path="/staff" element={
+          <ProtectedRoute requiredRole="staff">
+            <StaffDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/staff/appointments" element={
+          <ProtectedRoute requiredRole="staff">
+            <StaffAppointmentPage />
+          </ProtectedRoute>
+        } />
+        
         <Route
           path="*"
           element={
             <div className="min-h-screen bg-gray-50 flex flex-col">
+              <StaffRedirect />
               <Header />
               <main className="flex-1">
                 <Routes>

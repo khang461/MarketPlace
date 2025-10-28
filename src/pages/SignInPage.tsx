@@ -101,8 +101,12 @@ const SignInPage: React.FC = () => {
         showConfirmButton: false,
       });
 
-      // Redirect - chỉ USER được phép đăng nhập
-      const redirectPath = "/";
+      // Redirect dựa trên role
+      let redirectPath = "/";
+      
+      if (userRole.toLowerCase() === "staff") {
+        redirectPath = "/staff";
+      }
 
       setTimeout(() => navigate(redirectPath), 1500);
     } catch (error: unknown) {

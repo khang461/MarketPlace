@@ -5,6 +5,8 @@ interface AuthContextType {
   user: User | null;
   login: (userData: User) => void;
   logout: () => void;
+  isStaff: () => boolean;
+  isAdmin: () => boolean;
 }
 
 interface User {
@@ -57,8 +59,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     localStorage.removeItem("userId");
   };
 
+  const isStaff = () => {
+    return user?.role === 'staff' || user?.role === 'admin';
+  };
+
+  const isAdmin = () => {
+    return user?.role === 'admin';
+  };
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
+    <AuthContext.Provider value={{ 
+      isAuthenticated, 
+      user, 
+      login, 
+      logout, 
+      isStaff, 
+      isAdmin 
+    }}>
       {children}
     </AuthContext.Provider>
   );
