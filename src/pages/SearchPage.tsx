@@ -113,7 +113,7 @@ const SearchPage: React.FC = () => {
         const response = await api.get("/listings", { params });
 
         console.log("Listings response:", response.data);
-        console.log("Params used:", listings);
+        console.log("Params used:", params);
 
         setPagination(
           response.data.pagination || {
@@ -138,7 +138,7 @@ const SearchPage: React.FC = () => {
             mileage: listing.mileageKm,
             batteryHealth: Math.max(80, 100 - listing.chargeCycles / 20),
             location: `${listing.location.district}, ${listing.location.city}`,
-            images: listing.photos.map((p) => `http://localhost:8081${p.url}`),
+              images: listing.photos.map(p => p.url), // ✅ để nguyên
             postedDate: listing.createdAt,
             status:
               listing.condition === "LikeNew"
