@@ -15,6 +15,7 @@ import SignInPage from "./pages/SignInPage";
 import SignUpPage from "./pages/SignUpPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import EkycPage from "./pages/EkycPage";
 import ContractPage from "./pages/Contract/contract";
 import WalletPage from "./pages/WalletPage";
 import NotificationDepositPage from "./pages/NotificationDepositPage";
@@ -32,19 +33,25 @@ function App() {
       <ChatNotificationListener />
       <Routes>
         <Route path="/chat/:chatId" element={<ChatDetailPage />} />
-        
+
         {/* Staff Routes - Protected */}
-        <Route path="/staff" element={
-          <ProtectedRoute requiredRole="staff">
-            <StaffDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/staff/appointments" element={
-          <ProtectedRoute requiredRole="staff">
-            <StaffAppointmentPage />
-          </ProtectedRoute>
-        } />
-        
+        <Route
+          path="/staff"
+          element={
+            <ProtectedRoute requiredRole="staff">
+              <StaffDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/staff/appointments"
+          element={
+            <ProtectedRoute requiredRole="staff">
+              <StaffAppointmentPage />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="*"
           element={
@@ -57,9 +64,13 @@ function App() {
                   <Route path="/search" element={<SearchPage />} />
                   <Route path="/vehicle/:id" element={<VehicleDetailPage />} />
                   <Route path="/post-listing" element={<PostListingPage />} />
+                  <Route path="/ekyc" element={<EkycPage />} />
                   <Route path="/account" element={<AccountPage />} />
                   <Route path="/wallet" element={<WalletPage />} />
-                  <Route path="/notifications-deposit" element={<NotificationDepositPage />} />
+                  <Route
+                    path="/notifications-deposit"
+                    element={<NotificationDepositPage />}
+                  />
                   <Route
                     path="/notifications"
                     element={<NotificationsPage />}

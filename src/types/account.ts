@@ -27,11 +27,16 @@ export interface UserData {
     createdAt?: string;
     updatedAt?: string;
   };
+  // eKYC fields
+  ekycStatus?: "verified" | "pending" | "rejected" | string;
+  ekycProvider?: string;
+  ekycResult?: unknown;
+  verifiedAt?: string;
   stats?: {
     soldCount?: number;
     buyCount?: number;
     cancelRate?: number;
-    responseTime?: number;   // phút/giờ (tuỳ bạn hiển thị)
+    responseTime?: number; // phút/giờ (tuỳ bạn hiển thị)
     completionRate?: number; // 0..1 hoặc %
   };
 }
@@ -52,12 +57,12 @@ export type SellerRef =
 
 // Media từ Cloudinary (FE dùng trực tiếp `url` — đã là secure_url)
 export interface Media {
-  url: string;                  // Cloudinary secure_url
+  url: string; // Cloudinary secure_url
   kind: "photo" | "doc";
-  publicId: string;             // Cloudinary public_id (để xoá/sắp xếp) - BẮT BUỘC
+  publicId: string; // Cloudinary public_id (để xoá/sắp xếp) - BẮT BUỘC
   width?: number;
   height?: number;
-  format?: string;              // jpg | png | webp ...
+  format?: string; // jpg | png | webp ...
 }
 
 export interface Location {
@@ -119,13 +124,13 @@ interface BaseListing {
 /** Chỉ dành cho Car (theo mẫu hợp đồng) */
 export interface CarListing extends BaseListing {
   type: "Car";
-  licensePlate?: string;           // Biển số
-  engineDisplacementCc?: number;   // Dung tích xi lanh (cc)
-  vehicleType?: string;            // Loại xe: Sedan/SUV/Truck...
-  paintColor?: string;             // Màu sơn
-  engineNumber?: string;           // Số máy
-  chassisNumber?: string;          // Số khung
-  otherFeatures?: string;          // Đặc điểm khác
+  licensePlate?: string; // Biển số
+  engineDisplacementCc?: number; // Dung tích xi lanh (cc)
+  vehicleType?: string; // Loại xe: Sedan/SUV/Truck...
+  paintColor?: string; // Màu sơn
+  engineNumber?: string; // Số máy
+  chassisNumber?: string; // Số khung
+  otherFeatures?: string; // Đặc điểm khác
 
   // BE có thể gửi trường này cho Car → cho phép
   batteryCapacityKWh?: number;
@@ -164,12 +169,12 @@ export const isBatteryListing = (l: Listing): l is BatteryListing =>
  * ========= */
 export interface Transaction {
   id: string;
-  vehicleId: string;         // Listing._id
-  vehicleTitle: string;      // có thể build từ make/model/year
+  vehicleId: string; // Listing._id
+  vehicleTitle: string; // có thể build từ make/model/year
   buyerId?: string;
   sellerId?: string;
   amount: number;
   status: "completed" | "pending" | "cancelled";
   paymentMethod: string;
-  date: string;              // ISO string
+  date: string; // ISO string
 }

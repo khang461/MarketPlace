@@ -1,5 +1,5 @@
 import React from "react";
-import { User, Heart, Clock, Package, MessageCircle } from "lucide-react";
+import { User, Heart, Clock, Package } from "lucide-react";
 
 interface Tab {
   id: string;
