@@ -21,11 +21,6 @@ const AccountPage: React.FC = () => {
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
-  // Debug log
-  console.log("AccountPage - isAuthenticated:", isAuthenticated);
-  console.log("AccountPage - user:", user);
-  console.log("AccountPage - user.role:", user?.role);
-
   // Fetch user data from API
   useEffect(() => {
     const fetchUserData = async () => {

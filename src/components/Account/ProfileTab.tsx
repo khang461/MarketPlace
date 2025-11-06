@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   User,
   Package,
@@ -8,6 +9,8 @@ import {
   Save,
   Upload,
   Camera,
+  CreditCard,
+  CheckCircle2,
 } from "lucide-react";
 import { UserData } from "../../types/account";
 import api from "../../config/api";
@@ -40,6 +43,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ userData, onUpdate }) => {
   const [showUrlInput, setShowUrlInput] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleEditClick = () => {
     setIsEditing(true);
@@ -607,6 +611,21 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ userData, onUpdate }) => {
                 <strong>Số điện thoại:</strong>{" "}
                 {currentUser?.phone || "Chưa cập nhật"} (không thể chỉnh sửa)
               </p>
+              <div className="mt-4">
+                {(currentUser as UserData)?.ekycStatus !== "verified" ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/ekyc")}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 inline-flex items-center gap-2"
+                  >
+                    <CreditCard className="w-4 h-4" /> Bắt đầu xác minh eKYC
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center gap-2 text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
+                    <CheckCircle2 className="w-3 h-3" /> eKYC đã xác thực
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ) : (
@@ -691,6 +710,21 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ userData, onUpdate }) => {
                       : "Không hoạt động"}
                   </span>
                 </p>
+                <div className="pt-2">
+                  {(currentUser as UserData)?.ekycStatus !== "verified" ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate("/ekyc")}
+                      className="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 inline-flex items-center gap-2 text-sm"
+                    >
+                      <CreditCard className="w-4 h-4" /> Bắt đầu xác minh eKYC
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-2 text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
+                      <CheckCircle2 className="w-3 h-3" /> eKYC đã xác thực
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Address Display */}
