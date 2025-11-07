@@ -105,12 +105,14 @@ const EkycPage: React.FC = () => {
             : "Yêu cầu đang chờ xử lý. Vui lòng thử lại sau",
           confirmButtonColor: "#2563eb",
         });
-      } else {
+      } else if (status === "rejected" || !isMatch) {
         Swal.fire({
-          icon: "error",
+          icon: "warning",
           title: "Xác minh thất bại",
-          text: "Không thể xác minh danh tính. Vui lòng kiểm tra lại ảnh và thử lại",
-          confirmButtonColor: "#ef4444",
+          text: !isMatch
+            ? "Khuôn mặt không trùng khớp với CCCD. Vui lòng chụp lại ảnh rõ hơn và thử lại."
+            : "Yêu cầu đã bị từ chối. Vui lòng kiểm tra lại ảnh và thử lại",
+          confirmButtonColor: "#2563eb",
         });
       }
     } catch (error: unknown) {
@@ -252,14 +254,26 @@ const EkycPage: React.FC = () => {
                 <div className="flex items-center gap-2 mt-1 text-sm">
                   <span
                     className={`px-2 py-1 rounded-full ${
-                      result.status === "verified"
+                      result.status === "verified" &&
+                      result.faceMatch?.data?.isMatch === true
                         ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
+                        : result.status === "verified" &&
+                          result.faceMatch?.data?.isMatch === false
+                        ? "bg-red-100 text-red-700"
+                        : result.status === "rejected"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-yellow-100 text-yellow-700"
                     }`}
                   >
-                    {result.status === "verified"
+                    {result.status === "verified" &&
+                    result.faceMatch?.data?.isMatch === true
                       ? "Xác minh thành công"
-                      : "Xác minh thất bại"}
+                      : result.status === "verified" &&
+                        result.faceMatch?.data?.isMatch === false
+                      ? "Xác minh thất bại"
+                      : result.status === "rejected"
+                      ? "Xác minh thất bại"
+                      : "Chưa thể xác minh"}
                   </span>
                   {typeof result.score === "number" && (
                     <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-700">
