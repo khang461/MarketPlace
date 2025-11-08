@@ -10,6 +10,7 @@ import {
   LogOut,
   Wallet,
   FileText,
+  Gavel, // ✅ NEW
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { useAuth } from "../../contexts/AuthContext";
@@ -375,6 +376,16 @@ const Header: React.FC = () => {
             >
               Tìm kiếm
             </Link>
+
+            {/* ✅ NEW: Đấu giá */}
+            <Link
+              to="/auctions"
+              className="text-gray-700 hover:text-blue-600 font-medium flex items-center space-x-2"
+            >
+              <Gavel className="w-4 h-4" />
+              <span>Đấu giá</span>
+            </Link>
+
             <Link
               to="/post-listing"
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
@@ -465,7 +476,6 @@ const Header: React.FC = () => {
               </Link>
             )}
 
-
             <Link to="/support" className="text-gray-700 hover:text-blue-600">
               <MessageSquare className="w-6 h-6" />
             </Link>
@@ -502,6 +512,17 @@ const Header: React.FC = () => {
               >
                 Tìm kiếm
               </Link>
+
+              {/* ✅ NEW: Đấu giá */}
+              <Link
+                to="/auctions"
+                className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg flex items-center space-x-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <Gavel className="w-4 h-4" />
+                <span>Đấu giá</span>
+              </Link>
+
               <Link
                 to="/post-listing"
                 className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
