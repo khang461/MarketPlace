@@ -16,6 +16,7 @@ import Swal from "sweetalert2";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../config/api";
 import NotificationBellSimple from "../Common/NotificationBellSimple";
+import { getWonAuctionsPendingAppointment } from "../../config/auctionAPI";
 
 interface SearchSuggestion {
   query: string;
@@ -45,6 +46,8 @@ const Header: React.FC = () => {
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [popularSearches, setPopularSearches] = useState<PopularSearch[]>([]);
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
+  const [pendingAppointmentsCount, setPendingAppointmentsCount] =
+    useState<number>(0);
   const searchRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -124,6 +127,29 @@ const Header: React.FC = () => {
     };
 
     fetchUnreadNotifications();
+  }, [isAuthenticated]);
+
+  // Fetch pending appointments count
+  useEffect(() => {
+    const fetchPendingAppointments = async () => {
+      if (!isAuthenticated) return;
+
+      try {
+        const response = await getWonAuctionsPendingAppointment({
+          page: 1,
+          limit: 100,
+        });
+        // Chỉ đếm những phiên chưa có lịch hẹn
+        const pendingCount = (response.data || []).filter(
+          (auction) => !auction.hasAppointment || auction.appointment === null
+        ).length;
+        setPendingAppointmentsCount(pendingCount);
+      } catch (error) {
+        console.error("Error fetching pending appointments:", error);
+      }
+    };
+
+    fetchPendingAppointments();
   }, [isAuthenticated]);
 
   // Fetch suggestions when user types
@@ -427,9 +453,16 @@ const Header: React.FC = () => {
                   </div>
                   <Link
                     to="/account"
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 relative"
                   >
-                    Tài khoản
+                    <div className="flex items-center justify-between">
+                      <span>Tài khoản</span>
+                      {pendingAppointmentsCount > 0 && (
+                        <span className="bg-yellow-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-2">
+                          {pendingAppointmentsCount}
+                        </span>
+                      )}
+                    </div>
                   </Link>
                   <Link
                     to="/wallet"
@@ -446,7 +479,7 @@ const Header: React.FC = () => {
                     <span>Yêu cầu đặt cọc</span>
                     {unreadNotifications > 0 && (
                       <span className="ml-auto bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                        {unreadNotifications > 99 ? "99+" : unreadNotifications}
                       </span>
                     )}
                   </Link>
@@ -543,10 +576,17 @@ const Header: React.FC = () => {
                   </div>
                   <Link
                     to="/account"
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg relative"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Tài khoản
+                    <div className="flex items-center justify-between">
+                      <span>Tài khoản</span>
+                      {pendingAppointmentsCount > 0 && (
+                        <span className="bg-yellow-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-2">
+                          {pendingAppointmentsCount}
+                        </span>
+                      )}
+                    </div>
                   </Link>
                   <Link
                     to="/wallet"
@@ -565,7 +605,7 @@ const Header: React.FC = () => {
                     <span>Yêu cầu đặt cọc</span>
                     {unreadNotifications > 0 && (
                       <span className="ml-auto bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                        {unreadNotifications > 99 ? "99+" : unreadNotifications}
                       </span>
                     )}
                   </Link>

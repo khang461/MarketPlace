@@ -29,7 +29,8 @@ import "./utils/websocketDebug"; // Load debug tools
 // 🔽 thêm 3 import cho phần đấu giá
 import AuctionListPage from "./pages/Auction/AuctionListPage";
 import AuctionDetailPage from "./pages/Auction/AuctionDetailPage";
-import AuctionCreatePage from "./pages/Auction/AuctionCreatePage"; // nếu chưa có thì có thể xoá import này
+import AuctionCreatePage from "./pages/Auction/AuctionCreatePage";
+import AppointmentDetailPage from "./pages/AppointmentDetailPage"; // nếu chưa có thì có thể xoá import này
 
 // 🔽 bọc App bằng SocketProvider để bật realtime
 import { SocketProvider } from "./contexts/SocketContext";
@@ -108,6 +109,16 @@ function App() {
                       element={
                         <ProtectedRoute>
                           <AuctionCreatePage />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* 🔥 ROUTES LỊCH HẸN */}
+                    <Route
+                      path="/appointments/:appointmentId"
+                      element={
+                        <ProtectedRoute>
+                          <AppointmentDetailPage />
                         </ProtectedRoute>
                       }
                     />
