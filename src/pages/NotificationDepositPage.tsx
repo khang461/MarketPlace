@@ -44,6 +44,38 @@ const modernModalStyles = `
       transform: translateY(-1px) !important;
     }
     
+    .swal2-deny-modern {
+      background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+      border-radius: 8px !important;
+      padding: 12px 24px !important;
+      font-weight: 600 !important;
+      font-size: 14px !important;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+      transition: all 0.2s ease !important;
+    }
+    
+    .swal2-deny-modern:hover {
+      transform: translateY(-1px) !important;
+      box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .swal2-close-modern {
+      color: #6b7280 !important;
+      font-size: 24px !important;
+      font-weight: 300 !important;
+      width: 32px !important;
+      height: 32px !important;
+      line-height: 32px !important;
+      border-radius: 50% !important;
+      transition: all 0.2s ease !important;
+    }
+    
+    .swal2-close-modern:hover {
+      color: #374151 !important;
+      background-color: #f3f4f6 !important;
+      transform: rotate(90deg) !important;
+    }
+    
     .swal2-input:focus {
       border-color: #2563eb !important;
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
@@ -109,11 +141,28 @@ const NotificationDepositPage: React.FC = () => {
 
   const fetchNotifications = async () => {
     try {
+      console.log('[fetchNotifications] Fetching notifications...');
       const response = await api.get('/notifications');
       if (response.data.success) {
         // Response structure: { success: true, data: { notifications: [...], pagination: {...} } }
         const notificationsList = response.data.data?.notifications || response.data.data || [];
-        setNotifications(notificationsList);
+        console.log('[fetchNotifications] Received notifications:', notificationsList);
+        console.log('[fetchNotifications] Notifications with isAccepted:', notificationsList.map((n: Notification) => ({ id: n._id, type: n.type, isAccepted: n.isAccepted })));
+        
+        // Giữ lại trạng thái isAccepted từ state hiện tại nếu có
+        setNotifications(prev => {
+          const updated = notificationsList.map((newNotif: Notification) => {
+            const existingNotif = prev.find(p => p._id === newNotif._id);
+            // Nếu notification đã có isAccepted = true trong state cũ, giữ lại
+            if (existingNotif?.isAccepted === true) {
+              console.log('[fetchNotifications] Preserving isAccepted=true for notification:', newNotif._id);
+              return { ...newNotif, isAccepted: true };
+            }
+            return newNotif;
+          });
+          console.log('[fetchNotifications] Final notifications after merge:', updated);
+          return updated;
+        });
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -160,16 +209,21 @@ const NotificationDepositPage: React.FC = () => {
     e.stopPropagation(); // Ngăn chặn event bubble
     if (!notification.depositId) return;
 
+    console.log('[handleAcceptDeposit] Starting accept deposit for notification:', notification._id);
+    console.log('[handleAcceptDeposit] Current notification state:', notification);
+
     try {
       // Gọi API để chấp nhận đặt cọc với action CONFIRM
       const response = await api.post(`/deposits/${notification.depositId}/confirm`, {
         action: 'CONFIRM'
       });
       
+      console.log('[handleAcceptDeposit] API response:', response.data);
+      
       if (response.data.success) {
         // Cập nhật notification thành đã chấp nhận
-        setNotifications(prev => 
-          prev.map(n => 
+        setNotifications(prev => {
+          const updated = prev.map(n => 
             n._id === notification._id 
               ? { 
                   ...n, 
@@ -178,8 +232,11 @@ const NotificationDepositPage: React.FC = () => {
                   message: "Hãy đặt lịch cho cuộc hẹn của bạn"
                 }
               : n
-          )
-        );
+          );
+          console.log('[handleAcceptDeposit] Updated notifications state:', updated);
+          console.log('[handleAcceptDeposit] Updated notification isAccepted:', updated.find(n => n._id === notification._id)?.isAccepted);
+          return updated;
+        });
         
         Swal.fire({
           icon: "success",
@@ -198,7 +255,7 @@ const NotificationDepositPage: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error('Error accepting deposit:', error);
+      console.error('[handleAcceptDeposit] Error accepting deposit:', error);
       const axiosError = error as { response?: { data?: { message?: string } } };
       Swal.fire({
         icon: "error",
@@ -223,11 +280,15 @@ const NotificationDepositPage: React.FC = () => {
         // Xóa notification khỏi database
         try {
           await api.delete(`/notifications/${notification._id}`);
-          // Xóa thông báo khỏi danh sách
-          setNotifications(prev => prev.filter(n => n._id !== notification._id));
         } catch (deleteError) {
           console.error('Error deleting notification:', deleteError);
         }
+        
+        // ✅ Xóa notification khỏi state ngay lập tức để cải thiện UX
+        setNotifications(prev => prev.filter(n => n._id !== notification._id));
+        
+        // ✅ Reload danh sách notification từ server để đồng bộ
+        await fetchNotifications();
         
         Swal.fire({
           icon: "success",
@@ -275,8 +336,17 @@ const NotificationDepositPage: React.FC = () => {
       const response = await api.post(`/appointments/${notification.metadata.appointmentId}/confirm`);
       
       if (response.data.success) {
-        // Xóa notification sau khi chấp nhận
-        setNotifications(prev => prev.filter(n => n._id !== notification._id));
+        // ✅ Xóa notification sau khi chấp nhận lịch hẹn thành công
+        if (notification?._id) {
+          try {
+            await api.delete(`/notifications/${notification._id}`);
+            setNotifications(prev => prev.filter(n => n._id !== notification._id));
+          } catch (deleteError) {
+            console.error('Error deleting notification:', deleteError);
+            // Vẫn xóa khỏi state để không ảnh hưởng UX
+            setNotifications(prev => prev.filter(n => n._id !== notification._id));
+          }
+        }
         
         Swal.fire({
           icon: "success",
@@ -318,19 +388,56 @@ const NotificationDepositPage: React.FC = () => {
       });
       return;
     }
-  
+
+    // Hiển thị popup chọn giữa 2 options
+    const { value: action } = await Swal.fire({
+      title: "Bạn muốn yêu cầu đặt lịch lại hay hủy giao dịch?",
+      icon: "question",
+      showCancelButton: false,
+      showDenyButton: true,
+      showCloseButton: true,
+      confirmButtonText: "Yêu cầu đặt lịch lại",
+      denyButtonText: "Hủy giao dịch và hoàn tiền",
+      confirmButtonColor: "#2563eb",
+      denyButtonColor: "#dc3545",
+      allowOutsideClick: true,
+      allowEscapeKey: true,
+      customClass: {
+        popup: 'swal2-popup-modern',
+        confirmButton: 'swal2-confirm-modern',
+        denyButton: 'swal2-deny-modern',
+        closeButton: 'swal2-close-modern'
+      }
+    });
+
+    // Nếu user hủy dialog
+    if (action === undefined || action === null) {
+      return;
+    }
+
+    // Nếu chọn "Yêu cầu đặt lịch lại"
+    if (action === true) {
+      await handleRejectAppointmentRequest(notification);
+    }
+    // Nếu chọn "Hủy giao dịch và hoàn tiền"
+    else if (action === false) {
+      await handleCancelAppointment(notification);
+    }
+  };
+
+  const handleRejectAppointmentRequest = async (notification: Notification) => {
     // Hiển thị dialog để người dùng nhập lý do và chọn ngày rảnh
     const { value: formData } = await Swal.fire({
-      title: "Từ chối lịch hẹn",
+      title: "Yêu cầu đặt lịch lại",
       width: '520px',
       html: `
         <div class="text-left" style="max-width: 100%; overflow: hidden;">
           <div style="margin-bottom: 24px;">
-            <label class="block text-sm font-medium text-gray-700 mb-3">Lý do từ chối và ngày rảnh của bạn:</label>
+            <label class="block text-sm font-medium text-gray-700 mb-3">Lý do và ngày rảnh của bạn:</label>
             <textarea 
               id="rejectionReason" 
               style="width: 100%; margin: 0; padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; font-family: inherit; box-sizing: border-box; resize: none; min-height: 120px; line-height: 1.5;"
-              placeholder="Nêu lý do bạn từ chối và bạn có thể chọn những ngày mà bạn rảnh để cho người bán biết"
+              placeholder="Nêu lý do và bạn có thể chọn những ngày mà bạn rảnh để cho người bán biết"
               rows="5"
             ></textarea>
           </div>
@@ -347,7 +454,7 @@ const NotificationDepositPage: React.FC = () => {
       confirmButtonText: "Gửi",
       cancelButtonText: "Hủy",
       showCancelButton: true,
-      confirmButtonColor: "#dc3545",
+      confirmButtonColor: "#2563eb",
       cancelButtonColor: "#6b7280",
       customClass: {
         popup: 'swal2-popup-modern',
@@ -368,17 +475,36 @@ const NotificationDepositPage: React.FC = () => {
     }
 
     try {
-      // Gọi API để từ chối lịch hẹn
+      // Gọi API để từ chối lịch hẹn (yêu cầu đặt lịch lại)
+      if (!notification.metadata?.appointmentId) {
+        Swal.fire({
+          icon: "error",
+          title: "Lỗi!",
+          text: "Không tìm thấy thông tin lịch hẹn.",
+          confirmButtonColor: "#2563eb",
+        });
+        return;
+      }
+      
       const response = await api.post(`/appointments/${notification.metadata.appointmentId}/reject`, formData);
       
       if (response.data.success) {
-        // Xóa notification sau khi từ chối
-        setNotifications(prev => prev.filter(n => n._id !== notification._id));
+        // ✅ Xóa notification sau khi từ chối lịch hẹn thành công
+        if (notification?._id) {
+          try {
+            await api.delete(`/notifications/${notification._id}`);
+            setNotifications(prev => prev.filter(n => n._id !== notification._id));
+          } catch (deleteError) {
+            console.error('Error deleting notification:', deleteError);
+            // Vẫn xóa khỏi state để không ảnh hưởng UX
+            setNotifications(prev => prev.filter(n => n._id !== notification._id));
+          }
+        }
         
         Swal.fire({
           icon: "success",
           title: "Thành công!",
-          text: "Đã từ chối lịch hẹn. Người bán sẽ nhận được thông báo và có thể tạo lịch hẹn mới phù hợp hơn.",
+          text: "Đã gửi yêu cầu đặt lịch lại. Người bán sẽ nhận được thông báo và có thể tạo lịch hẹn mới phù hợp hơn.",
           confirmButtonColor: "#2563eb",
           timer: 2000,
           showConfirmButton: false,
@@ -387,7 +513,7 @@ const NotificationDepositPage: React.FC = () => {
         Swal.fire({
           icon: "error",
           title: "Lỗi!",
-          text: response.data.message || "Có lỗi xảy ra khi từ chối lịch hẹn.",
+          text: response.data.message || "Có lỗi xảy ra khi gửi yêu cầu đặt lịch lại.",
           confirmButtonColor: "#2563eb",
         });
       }
@@ -397,17 +523,110 @@ const NotificationDepositPage: React.FC = () => {
       Swal.fire({
         icon: "error",
         title: "Lỗi hệ thống!",
-        text: axiosError.response?.data?.message || "Không thể từ chối lịch hẹn. Vui lòng thử lại sau.",
+        text: axiosError.response?.data?.message || "Không thể gửi yêu cầu đặt lịch lại. Vui lòng thử lại sau.",
+        confirmButtonColor: "#2563eb",
+      });
+    }
+  };
+
+  const handleCancelAppointment = async (notification: Notification) => {
+    // Hiển thị dialog để người dùng nhập lý do hủy
+    const { value: formData } = await Swal.fire({
+      title: "Hủy giao dịch và hoàn tiền",
+      width: '520px',
+      html: `
+        <div class="text-left" style="max-width: 100%; overflow: hidden;">
+          <div style="margin-bottom: 24px;">
+            <label class="block text-sm font-medium text-gray-700 mb-3">Lý do hủy giao dịch:</label>
+            <textarea 
+              id="cancelReason" 
+              style="width: 100%; margin: 0; padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; font-family: inherit; box-sizing: border-box; resize: none; min-height: 120px; line-height: 1.5;"
+              placeholder="Nêu lý do bạn muốn hủy giao dịch (tùy chọn)"
+              rows="5"
+            ></textarea>
+          </div>
+          
+          <div class="text-sm text-yellow-600 bg-yellow-50 p-3 rounded-lg">
+            <p>⚠️ <strong>Lưu ý:</strong> Nếu bạn đã đặt cọc, tiền sẽ được hoàn về ví của bạn sau khi hủy giao dịch.</p>
+          </div>
+        </div>
+      `,
+      confirmButtonText: "Xác nhận hủy",
+      cancelButtonText: "Hủy",
+      showCancelButton: true,
+      confirmButtonColor: "#dc3545",
+      cancelButtonColor: "#6b7280",
+      customClass: {
+        popup: 'swal2-popup-modern',
+        confirmButton: 'swal2-confirm-modern',
+        cancelButton: 'swal2-cancel-modern'
+      },
+      preConfirm: () => {
+        const reason = (document.getElementById('cancelReason') as HTMLTextAreaElement).value;
+        return {
+          reason: reason || ""
+        };
+      }
+    });
+
+    // Nếu user hủy dialog
+    if (!formData) {
+      return;
+    }
+
+    try {
+      // Gọi API để hủy giao dịch và hoàn tiền
+      const response = await api.put(`/appointments/${notification.metadata?.appointmentId}/cancel`, formData);
+      
+      if (response.data.success) {
+        // ✅ Xóa notification sau khi hủy giao dịch thành công
+        if (notification?._id) {
+          try {
+            await api.delete(`/notifications/${notification._id}`);
+            setNotifications(prev => prev.filter(n => n._id !== notification._id));
+          } catch (deleteError) {
+            console.error('Error deleting notification:', deleteError);
+            // Vẫn xóa khỏi state để không ảnh hưởng UX
+            setNotifications(prev => prev.filter(n => n._id !== notification._id));
+          }
+        }
+        
+        const message = response.data.refunded 
+          ? response.data.message || "Đã hủy giao dịch thành công, tiền đã hoàn về ví của bạn"
+          : response.data.message || "Hủy lịch hẹn thành công";
+        
+        Swal.fire({
+          icon: "success",
+          title: "Thành công!",
+          text: message,
+          confirmButtonColor: "#2563eb",
+          timer: 3000,
+          showConfirmButton: false,
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Lỗi!",
+          text: response.data.message || "Có lỗi xảy ra khi hủy giao dịch.",
+          confirmButtonColor: "#2563eb",
+        });
+      }
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi hệ thống!",
+        text: axiosError.response?.data?.message || "Không thể hủy giao dịch. Vui lòng thử lại sau.",
         confirmButtonColor: "#2563eb",
       });
     }
   };
   const handleCreateAppointment = async (e: React.MouseEvent, notification: Notification) => {
-    e.stopPropagation(); // Ngăn chặn event bubble
-    
-    // Lấy depositId từ notification metadata hoặc trực tiếp từ notification
+    e.stopPropagation();
+  
     const depositRequestId = notification.depositId || notification.metadata?.depositRequestId;
-    
+  
     if (!depositRequestId) {
       Swal.fire({
         icon: "error",
@@ -417,7 +636,13 @@ const NotificationDepositPage: React.FC = () => {
       });
       return;
     }
-
+  
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+  
     const { value: formData } = await Swal.fire({
       title: "Tạo lịch hẹn",
       width: '520px',
@@ -428,9 +653,11 @@ const NotificationDepositPage: React.FC = () => {
             <input 
               id="appointmentDate" 
               type="date" 
+              min="${todayStr}"
               style="width: 100%; margin: 0; padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; font-family: inherit; box-sizing: border-box; height: 48px;"
               required
             />
+            <p class="text-xs text-gray-500 mt-1">Chỉ có thể chọn từ ngày hôm nay trở đi</p>
           </div>
           
           <div style="margin-bottom: 24px;">
@@ -438,9 +665,12 @@ const NotificationDepositPage: React.FC = () => {
             <input 
               id="appointmentTime" 
               type="time" 
+              min="08:00"
+              max="17:00"
               style="width: 100%; margin: 0; padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; font-family: inherit; box-sizing: border-box; height: 48px;"
               required
             />
+            <p class="text-xs text-gray-500 mt-1">Giờ hành chính: 08:00 - 17:00</p>
           </div>
           
           <div style="margin-bottom: 24px;">
@@ -480,32 +710,86 @@ const NotificationDepositPage: React.FC = () => {
         const appointmentTime = (document.getElementById('appointmentTime') as HTMLInputElement).value;
         const location = (document.getElementById('location') as HTMLInputElement).value;
         const notes = (document.getElementById('notes') as HTMLTextAreaElement).value;
-
+  
         if (!appointmentDate || !appointmentTime || !location) {
           Swal.showValidationMessage('Vui lòng điền đầy đủ thông tin bắt buộc');
           return false;
         }
-
-        // Kết hợp ngày và giờ thành ISO string theo yêu cầu BE
-        const scheduledDateTime = new Date(`${appointmentDate}T${appointmentTime}:00`).toISOString();
-
+  
+        // Kiểm tra ngày hẹn phải từ hôm nay trở đi
+        const selectedDate = new Date(appointmentDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        selectedDate.setHours(0, 0, 0, 0);
+        
+        if (selectedDate < today) {
+          Swal.showValidationMessage('Ngày hẹn phải từ ngày hôm nay trở đi');
+          return false;
+        }
+  
+        // Kiểm tra giờ hành chính (8:00 - 17:00)
+        const [hours, minutes] = appointmentTime.split(':').map(Number);
+        const totalMinutes = hours * 60 + minutes;
+        const minMinutes = 8 * 60; // 08:00
+        const maxMinutes = 17 * 60; // 17:00
+  
+        if (totalMinutes < minMinutes || totalMinutes > maxMinutes) {
+          Swal.showValidationMessage('Giờ hẹn phải trong giờ hành chính (08:00 - 17:00)');
+          return false;
+        }
+  
+        // Nếu chọn ngày hôm nay, kiểm tra giờ hẹn phải >= giờ hiện tại
+        if (selectedDate.getTime() === today.getTime()) {
+          const now = new Date();
+          const selectedDateTime = new Date(`${appointmentDate}T${appointmentTime}:00`);
+          
+          if (selectedDateTime <= now) {
+            Swal.showValidationMessage('Nếu chọn ngày hôm nay, giờ hẹn phải sau giờ hiện tại');
+            return false;
+          }
+        }
+  
+        // ✅ FIX: Tạo Date object và format với timezone offset
+        const localDateTime = new Date(`${appointmentDate}T${appointmentTime}:00`);
+        
+        // Lấy timezone offset (ví dụ: +07:00 cho GMT+7)
+        const timezoneOffset = -localDateTime.getTimezoneOffset();
+        const offsetHours = Math.floor(Math.abs(timezoneOffset) / 60);
+        const offsetMinutes = Math.abs(timezoneOffset) % 60;
+        const offsetSign = timezoneOffset >= 0 ? '+' : '-';
+        const timezoneString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+  
+        // Format: YYYY-MM-DDTHH:mm:ss+07:00
+        const scheduledDateTime = `${appointmentDate}T${appointmentTime}:00${timezoneString}`;
+  
         return {
           depositRequestId: depositRequestId,
-          scheduledDate: scheduledDateTime,
+          scheduledDate: scheduledDateTime, // "2025-10-30T14:30:00+07:00"
           location: location,
           notes: notes || ""
         };
       }
     });
-
-    if (!formData) return;
-
+  
+    if (!formData) {
+      return;
+    }
+  
     try {
       const response = await api.post('/appointments', formData);
       
       if (response.data.success) {
-        // Xóa notification sau khi tạo lịch thành công
-        setNotifications(prev => prev.filter(n => n._id !== notification._id));
+        // ✅ Xóa notification sau khi tạo lịch thành công
+        if (notification?._id) {
+          try {
+            await api.delete(`/notifications/${notification._id}`);
+            setNotifications(prev => prev.filter(n => n._id !== notification._id));
+          } catch (deleteError) {
+            console.error('Error deleting notification:', deleteError);
+            // Vẫn xóa khỏi state để không ảnh hưởng UX
+            setNotifications(prev => prev.filter(n => n._id !== notification._id));
+          }
+        }
         
         Swal.fire({
           icon: "success",
@@ -639,7 +923,7 @@ const NotificationDepositPage: React.FC = () => {
                     </p>
                     {notification.metadata?.amount && !notification.isAccepted && (
                       <p className="text-sm font-medium text-green-600 mt-1">
-                        {notification.metadata.amount.toLocaleString('vi-VN')} VND
+                       Tiền đặt cọc: {notification.metadata.amount.toLocaleString('vi-VN')} VND
                       </p>
                     )}
                     <p className="text-xs text-gray-400 mt-2">
@@ -647,33 +931,38 @@ const NotificationDepositPage: React.FC = () => {
                     </p>
 
                     {/* Action buttons for deposit notifications */}
-                    {notification.type === 'deposit' && (
-                      <div className="flex gap-2 mt-3">
-                        {notification.isAccepted ? (
-                          <button
-                            onClick={(e) => handleCreateAppointment(e, notification)}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                          >
-                            Tạo lịch
-                          </button>
-                        ) : (
-                          <>
+                    {notification.type === 'deposit' && (() => {
+                      console.log('[Render] Rendering deposit notification buttons for:', notification._id);
+                      console.log('[Render] notification.isAccepted:', notification.isAccepted);
+                      console.log('[Render] Full notification object:', notification);
+                      return (
+                        <div className="flex gap-2 mt-3">
+                          {notification.isAccepted ? (
                             <button
-                              onClick={(e) => handleAcceptDeposit(e, notification)}
-                              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                              onClick={(e) => handleCreateAppointment(e, notification)}
+                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                             >
-                              Chấp nhận
+                              Tạo lịch
                             </button>
-                            <button
-                              onClick={(e) => handleRejectDeposit(e, notification)}
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                            >
-                              Từ chối
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    )}
+                          ) : (
+                            <>
+                              <button
+                                onClick={(e) => handleAcceptDeposit(e, notification)}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                              >
+                                Chấp nhận
+                              </button>
+                              <button
+                                onClick={(e) => handleRejectDeposit(e, notification)}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                              >
+                                Từ chối
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Action buttons for contract notifications */}
                     {notification.type === 'appointment_created' && (

@@ -9,7 +9,9 @@ import {
   DepositButton,
   BidBox,
   AuctionHistory,
+  EndAuctionButton,
 } from "../../components/Auction";
+import CreateAppointmentButton from "../../components/Auction/CreateAppointmentButton";
 import { useSocket } from "../../contexts/SocketContext";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../config/api";
@@ -63,6 +65,7 @@ export default function AuctionDetailPage() {
   const [auction, setAuction] = useState<Auction | null>(null);
   const [sellerId, setSellerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sellerIdLoaded, setSellerIdLoaded] = useState(false);
 
   // dùng để yêu cầu BidBox re-check trạng thái cọc sau khi DepositButton thay đổi
   const [depVersion, setDepVersion] = useState(0);
@@ -76,37 +79,58 @@ export default function AuctionDetailPage() {
       const { data } = await getAuctionById(auctionId);
       setAuction(data);
 
-      // lấy sellerId từ nhiều nơi
-      let sid =
-        (data as any)?.sellerId ??
-        (data as any)?.ownerId ??
-        (data as any)?.createdBy ??
-        (data as any)?.listing?.sellerId ??
-        (data as any)?.listing?.ownerId ??
-        (data as any)?.listing?.userId ??
-        null;
+      // Lấy sellerId từ response
+      // Backend có thể trả về seller object hoặc sellerId string
+      let sid: string | null = null;
 
-      // nếu vẫn chưa có -> gọi listings/:id
+      // 1. Kiểm tra seller object (format mới)
+      if ((data as any)?.seller?.userId) {
+        sid = (data as any).seller.userId;
+      }
+      // 2. Kiểm tra sellerId trực tiếp
+      else if ((data as any)?.sellerId) {
+        sid = (data as any).sellerId;
+      }
+      // 3. Kiểm tra trong listing
+      else if ((data as any)?.listingId?.sellerId) {
+        sid = (data as any).listingId.sellerId;
+      }
+      // 4. Các field khác
+      else {
+        sid =
+          (data as any)?.ownerId ??
+          (data as any)?.createdBy ??
+          (data as any)?.listing?.sellerId ??
+          (data as any)?.listing?.ownerId ??
+          (data as any)?.listing?.userId ??
+          null;
+      }
+
+      // Nếu vẫn chưa có, thử gọi API listings
       if (!sid) {
         const listingId =
           typeof data.listingId === "string"
             ? data.listingId
-            : (data as any)?.listing?._id;
+            : (data as any)?.listingId?._id;
         if (listingId) {
           try {
             const r = await api.get(`/listings/${listingId}`);
             const L = r?.data || {};
-            sid = L?.ownerId || L?.userId || L?.sellerId || L?.createdBy || null;
+            sid =
+              L?.ownerId || L?.userId || L?.sellerId || L?.createdBy || null;
           } catch {
             /* ignore */
           }
         }
       }
+
       setSellerId(sid ?? null);
+      setSellerIdLoaded(true); // Đánh dấu đã load xong sellerId
     } catch (e) {
       console.error("fetch auction error:", e);
       setAuction(null);
       setSellerId(null);
+      setSellerIdLoaded(true);
     } finally {
       setLoading(false);
     }
@@ -151,7 +175,8 @@ export default function AuctionDetailPage() {
     now < new Date(auction.endAt).getTime();
 
   const isEnded =
-    uiStatus === "ENDED" || (!!auction && now >= new Date(auction.endAt).getTime());
+    uiStatus === "ENDED" ||
+    (!!auction && now >= new Date(auction.endAt).getTime());
 
   const canBid = !isEnded && inWindow && uiStatus === "RUNNING" && !isSeller;
 
@@ -182,8 +207,19 @@ export default function AuctionDetailPage() {
           .join(", ");
 
   const winnerBid = useMemo(() => topBid(auction), [auction]);
-  const isMeWinner =
-    !!winnerBid && !!me && String(winnerBid.userId) === String(me);
+
+  // Kiểm tra winner - userId có thể là string hoặc object
+  const isMeWinner = useMemo(() => {
+    if (!winnerBid || !me) return false;
+
+    // Lấy userId từ winnerBid
+    const winnerUserId =
+      typeof (winnerBid as any).userId === "string"
+        ? (winnerBid as any).userId
+        : (winnerBid as any).userId?._id || (winnerBid as any).userId?.id;
+
+    return !!winnerUserId && String(winnerUserId) === String(me);
+  }, [winnerBid, me]);
 
   const onAfterBid = (b: Bid) => {
     setAuction((prev) =>
@@ -268,7 +304,7 @@ export default function AuctionDetailPage() {
 
         {/* Panel Kết quả khi đã kết thúc */}
         {isEnded && (
-          <div className="rounded-xl border p-4 bg-gray-50 space-y-2">
+          <div className="rounded-xl border p-4 bg-gray-50 space-y-3">
             <h4 className="font-semibold">Kết quả phiên</h4>
             {winnerBid ? (
               <>
@@ -276,7 +312,11 @@ export default function AuctionDetailPage() {
                   Người thắng:{" "}
                   <b>
                     {safeText(
-                      (winnerBid as any).user?.fullName ||
+                      // Backend mới trả userId là object với fullName
+                      (winnerBid as any).userId?.fullName ||
+                        (winnerBid as any).userId?.name ||
+                        // Fallback cho format cũ
+                        (winnerBid as any).user?.fullName ||
                         (winnerBid as any).user?.name ||
                         (winnerBid as any).user ||
                         winnerBid.userId
@@ -288,10 +328,20 @@ export default function AuctionDetailPage() {
                 </div>
 
                 {isMeWinner && (
-                  <div className="text-xs p-2 rounded-md bg-emerald-50 text-emerald-700">
-                    Bạn đã thắng phiên này. Vui lòng chờ hệ thống xác nhận/khấu trừ
-                    tiền cọc và liên hệ người bán để hoàn tất giao dịch.
-                  </div>
+                  <>
+                    <div className="text-xs p-2 rounded-md bg-emerald-50 text-emerald-700">
+                      🎉 Chúc mừng! Bạn đã thắng phiên đấu giá này.
+                      <br />
+                      Vui lòng tạo lịch hẹn để ký hợp đồng với người bán.
+                    </div>
+
+                    {/* Button tạo lịch hẹn cho winner */}
+                    <CreateAppointmentButton
+                      auctionId={auction._id}
+                      isWinner={isMeWinner}
+                      winningPrice={winnerBid.price}
+                    />
+                  </>
                 )}
 
                 {isSeller && (
@@ -299,13 +349,20 @@ export default function AuctionDetailPage() {
                     Bạn là người bán. Người thắng là{" "}
                     <b>
                       {safeText(
-                        (winnerBid as any).user?.fullName ||
+                        // Backend mới trả userId là object
+                        (winnerBid as any).userId?.fullName ||
+                          (winnerBid as any).userId?.name ||
+                          // Fallback cho format cũ
+                          (winnerBid as any).user?.fullName ||
                           (winnerBid as any).user?.name ||
                           (winnerBid as any).user ||
                           winnerBid.userId
                       )}
                     </b>{" "}
                     với mức <b>{winnerBid.price.toLocaleString("vi-VN")}₫</b>.
+                    <br />
+                    Vui lòng chờ người mua tạo lịch hẹn và xác nhận để hoàn tất
+                    giao dịch.
                   </div>
                 )}
               </>
@@ -318,7 +375,11 @@ export default function AuctionDetailPage() {
         )}
 
         <div className="rounded-xl border p-4 space-y-3">
-          {!isSeller ? (
+          {!sellerIdLoaded ? (
+            <div className="p-3 text-center text-gray-500">
+              Đang kiểm tra quyền...
+            </div>
+          ) : !isSeller ? (
             <>
               <DepositButton
                 auctionId={auction._id}
@@ -345,16 +406,37 @@ export default function AuctionDetailPage() {
               )}
             </>
           ) : (
-            <div className="p-3 rounded-md bg-amber-50 text-amber-700 text-sm">
-              Bạn là <b>người đăng bán</b> cho phiên này nên không thể tham gia đấu
-              giá và không cần đặt cọc.
-            </div>
+            <>
+              <div className="p-3 rounded-md bg-amber-50 text-amber-700 text-sm">
+                Bạn là <b>người đăng bán</b> cho phiên này.
+              </div>
+
+              {/* Nút kết thúc phiên đấu giá cho seller khi phiên đang diễn ra */}
+              {!isEnded && uiStatus === "RUNNING" && (
+                <EndAuctionButton
+                  auctionId={auction._id}
+                  currentBidCount={auction.bids?.length || 0}
+                  onAuctionEnded={load}
+                />
+              )}
+
+              {isEnded && (
+                <div className="p-3 rounded-md bg-gray-50 text-gray-700 text-sm">
+                  Phiên đấu giá đã kết thúc.
+                  {winnerBid && (
+                    <div className="mt-2">
+                      Vui lòng chờ người mua tạo lịch hẹn để hoàn tất giao dịch.
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           {!isConnected && (
             <div className="text-xs text-amber-600">
-              Mất kết nối realtime — trang vẫn hoạt động nhưng không tự cập nhật.
-              Hãy tải lại nếu cần.
+              Mất kết nối realtime — trang vẫn hoạt động nhưng không tự cập
+              nhật. Hãy tải lại nếu cần.
             </div>
           )}
         </div>

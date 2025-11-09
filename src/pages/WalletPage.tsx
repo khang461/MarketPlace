@@ -8,8 +8,12 @@ interface WalletInfo {
   frozenAmount: number;
   totalDeposited: number;
   totalWithdrawn: number;
+  totalSpent: number;
   currency: string;
   status: string;
+  totalRefunded: number;
+  escrowAmount: number;
+  lastTransactionAt?: string;
 }
 
 interface VNPayPaymentResponse {
@@ -78,6 +82,18 @@ const WalletPage: React.FC = () => {
     }).format(value);
   };
 
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
     setTimeout(() => {
@@ -136,53 +152,104 @@ const WalletPage: React.FC = () => {
           <p className="text-gray-600">Quản lý số dư và nạp tiền vào ví</p>
         </div>
 
-        {/* Wallet Info Card */}
+        {/* Wallet Info Cards */}
         {walletInfo && (
-          <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl shadow-xl p-8 mb-8 text-white">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <p className="text-blue-200 text-sm font-medium mb-2">Số dư hiện tại</p>
-                <h2 className="text-4xl font-bold mb-4">{formatCurrency(walletInfo.balance)}</h2>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-blue-200">Tiền Đã Cọc:</span>
-                    <span className="font-semibold">{formatCurrency(walletInfo.frozenAmount)}</span>
-                  </div>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* Card trái: "Ví của tôi" */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl shadow-xl p-8 text-white">
+              <h3 className="text-lg font-semibold text-blue-100 mb-6">Ví của tôi</h3>
+              
+              {/* Dòng 1: Số dư khả dụng (to, đậm) */}
+              <div className="mb-6">
+                <p className="text-blue-200 text-sm font-medium mb-2">Số dư khả dụng</p>
+                <h2 className="text-4xl font-bold">{formatCurrency(walletInfo.balance)}</h2>
               </div>
 
-              <div>
-                <div className="bg-white bg-opacity-20 rounded-lg p-4 mb-4">
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-blue-200">Đã nạp:</span>
-                      <span className="font-semibold">{formatCurrency(walletInfo.totalDeposited)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-blue-200">Đã rút:</span>
-                      <span className="font-semibold">{formatCurrency(walletInfo.totalWithdrawn)}</span>
-                    </div>
-                    <div className="flex justify-between pt-2 border-t border-blue-300">
-                      <span className="text-blue-200">Trạng thái:</span>
-                      <span className={`font-semibold px-2 py-1 rounded ${
-                        walletInfo.status === 'ACTIVE' ? 'bg-green-500' : 'bg-red-500'
-                      }`}>
-                        {walletInfo.status}
-                      </span>
+              <div className="space-y-3">
+                {/* Dòng 2: Đang tạm giữ */}
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-blue-200">Đang tạm giữ:</span>
+                    <div className="group relative">
+                      <svg className="w-4 h-4 text-blue-300 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                      </svg>
+                      <div className="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg z-10">
+                        Số tiền tạm thời không thể sử dụng vì đang chờ xác nhận đơn hàng/hoàn tiền/điều kiện khác.
+                      </div>
                     </div>
                   </div>
+                  <span className="font-semibold">{formatCurrency(walletInfo.frozenAmount)}</span>
                 </div>
+
+                {/* Dòng 3: Trong ví escrow (chỉ hiển thị nếu > 0) */}
+                {walletInfo.escrowAmount > 0 && (
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-200">Trong ví escrow:</span>
+                      <div className="group relative">
+                        <svg className="w-4 h-4 text-blue-300 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                        </svg>
+                        <div className="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg z-10">
+                          Số tiền đang nằm ở ví trung gian/bảo chứng và sẽ được giải ngân hoặc hoàn lại theo điều kiện.
+                        </div>
+                      </div>
+                    </div>
+                    <span className="font-semibold">{formatCurrency(walletInfo.escrowAmount)}</span>
+                  </div>
+                )}
+
+                {/* Dòng 4: Tổng số dư (màu trung tính, nhỏ hơn) */}
+                <div className="pt-3 border-t border-blue-300">
+                  <div className="flex justify-between items-center">
+                    <span className="text-blue-300 text-sm">Tổng số dư:</span>
+                    <span className="text-blue-200 text-sm font-medium">
+                      {formatCurrency(walletInfo.balance + walletInfo.frozenAmount + walletInfo.escrowAmount)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Dòng 5: Status và lastTransactionAt (phụ) */}
+                {/* <div className="pt-2 flex justify-between items-center text-xs text-blue-300">
+                  <div className="flex items-center gap-2">
+                    <span>Trạng thái:</span>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      walletInfo.status === 'ACTIVE' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                    }`}>
+                      {walletInfo.status}
+                    </span>
+                  </div>
+                  {walletInfo.lastTransactionAt && (
+                    <span>Cập nhật: {formatDate(walletInfo.lastTransactionAt)}</span>
+                  )}
+                </div> */}
               </div>
             </div>
 
-            {/* <div className="mt-6 flex justify-center">
-              <div className="bg-white bg-opacity-20 rounded-full p-4">
-                <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
+            {/* Card phải: "Hoạt động trọn đời" */}
+            <div className="bg-gradient-to-r from-green-600 to-green-800 rounded-2xl shadow-xl p-8 text-white">
+              <h3 className="text-lg font-semibold text-green-100 mb-6">Số liệu tích lũy</h3>
+              
+              <div className="bg-white bg-opacity-20 rounded-lg p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-green-200">Đã nạp:</span>
+                  <span className="font-semibold">{formatCurrency(walletInfo.totalDeposited)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-green-200">Đã sử dụng:</span>
+                  <span className="font-semibold">{formatCurrency(walletInfo.totalSpent)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-green-200">Đã hoàn lại:</span>
+                  <span className="font-semibold">{formatCurrency(walletInfo.totalRefunded)}</span>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-green-300">
+                  <span className="text-green-200">Đã rút:</span>
+                  <span className="font-semibold">{formatCurrency(walletInfo.totalWithdrawn)}</span>
+                </div>
               </div>
-            </div> */}
+            </div>
           </div>
         )}
 
