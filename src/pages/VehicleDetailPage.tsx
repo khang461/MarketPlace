@@ -166,6 +166,38 @@ const VehicleDetailPage: React.FC = () => {
     }
   };
 
+  // Helper function để hiển thị popup số dư không đủ
+  const showInsufficientBalanceDialog = (
+    requiredAmount: number,
+    currentBalance: number,
+    missingAmount: number,
+    vnpayUrl: string
+  ) => {
+    Swal.fire({
+      icon: "warning",
+      title: "Số dư không đủ",
+      html: `
+        <div class="text-left space-y-2">
+          <p>Tổng tiền cần đặt cọc: <strong class="text-blue-600">${formatPrice(requiredAmount)}</strong></p>
+          <p>Số dư hiện tại: <strong>${formatPrice(currentBalance)}</strong></p>
+          <div class="border-b pb-2 mb-2">
+            <p class="text-lg font-semibold text-orange-600">Bạn chỉ cần nạp thêm: <strong>${formatPrice(missingAmount)}</strong></p>
+          </div>
+          <p class="mt-3 text-gray-600">Bạn có muốn nạp trực tiếp <strong>${formatPrice(missingAmount)}</strong> vào ví để đặt cọc không?</p>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "Nạp tiền",
+      cancelButtonText: "Hủy",
+      confirmButtonColor: "#2563eb",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        // Redirect to VNPay để nạp tiền (chỉ nạp số tiền còn thiếu)
+        window.location.href = vnpayUrl;
+      }
+    });
+  };
+
   const handleDeposit = async () => {
     if (!isAuthenticated) {
       Swal.fire({
@@ -213,7 +245,7 @@ const VehicleDetailPage: React.FC = () => {
         return parseInt(amount);
       }
     });
-
+    
     if (!depositAmount) return;
 
     // Gọi API đặt cọc
@@ -227,29 +259,21 @@ const VehicleDetailPage: React.FC = () => {
         Swal.fire({
           icon: "success",
           title: "Đặt cọc thành công!",
-          text: "Yêu cầu đặt cọc của bạn đã được gửi đến người bán, xin hãy đợi phản hồi từ Gmail của chúng tôi  ",
+          text: "Yêu cầu đặt cọc của bạn đã được gửi đến người bán, xin hãy kiểm tra mục 「Yêu cầu đặt cọc」thường xuyên!",
           confirmButtonColor: "#2563eb",
         });
       } else if (response.data.vnpayUrl) {
         // Số dư không đủ, BE trả về URL VNPay để nạp tiền
-        Swal.fire({
-          icon: "warning",
-          title: "Số dư không đủ",
-          html: `
-            <p>Bạn cần <strong>${formatPrice(response.data.requiredAmount || 0)}</strong> để đặt cọc</p>
-            <p>Số dư hiện tại: <strong>${formatPrice(response.data.currentBalance || 0)}</strong></p>
-            <p class="mt-3">Bạn có muốn nạp tiền vào ví để đặt cọc không?</p>
-          `,
-          showCancelButton: true,
-          confirmButtonText: "Nạp tiền",
-          cancelButtonText: "Hủy",
-          confirmButtonColor: "#2563eb",
-        }).then((result) => {
-          if (result.isConfirmed) {
-            // Redirect to VNPay để nạp tiền
-            window.location.href = response.data.vnpayUrl || '';
-          }
-        });
+        const requiredAmount = response.data.requiredAmount || 0;
+        const currentBalance = response.data.currentBalance || 0;
+        const missingAmount = response.data.missingAmount || (requiredAmount - currentBalance);
+        
+        showInsufficientBalanceDialog(
+          requiredAmount,
+          currentBalance,
+          missingAmount,
+          response.data.vnpayUrl || ''
+        );
       } else {
         // Lỗi khác
         Swal.fire({
@@ -262,29 +286,21 @@ const VehicleDetailPage: React.FC = () => {
     } catch (error: unknown) {
       console.error("Error creating deposit:", error);
       const axiosError = error as {
-        response?: { data?: { message?: string; error?: string; vnpayUrl?: string; requiredAmount?: number; currentBalance?: number } };
+        response?: { data?: { message?: string; error?: string; vnpayUrl?: string; requiredAmount?: number; currentBalance?: number; missingAmount?: number } };
       };
 
       // Kiểm tra nếu có vnpayUrl trong response lỗi
       if (axiosError.response?.data?.vnpayUrl) {
-        Swal.fire({
-          icon: "warning",
-          title: "Số dư không đủ",
-          html: `
-            <p>Bạn cần <strong>${formatPrice(axiosError.response.data.requiredAmount || 0)}</strong> để đặt cọc</p>
-            <p>Số dư hiện tại: <strong>${formatPrice(axiosError.response.data.currentBalance || 0)}</strong></p>
-            <p class="mt-3">Bạn có muốn nạp tiền vào ví để đặt cọc không?</p>
-          `,
-          showCancelButton: true,
-          confirmButtonText: "Nạp tiền",
-          cancelButtonText: "Hủy",
-          confirmButtonColor: "#2563eb",
-        }).then((result) => {
-          if (result.isConfirmed) {
-            // Redirect to VNPay để nạp tiền
-            window.location.href = axiosError.response?.data?.vnpayUrl || "";
-          }
-        });
+        const requiredAmount = axiosError.response.data.requiredAmount || 0;
+        const currentBalance = axiosError.response.data.currentBalance || 0;
+        const missingAmount = axiosError.response.data.missingAmount || (requiredAmount - currentBalance);
+        
+        showInsufficientBalanceDialog(
+          requiredAmount,
+          currentBalance,
+          missingAmount,
+          axiosError.response.data.vnpayUrl || ""
+        );
       } else if (axiosError.response?.data?.error?.includes("freezeAmount is not a function")) {
         // Lỗi backend - walletService không có freezeAmount function
         Swal.fire({
@@ -297,14 +313,17 @@ const VehicleDetailPage: React.FC = () => {
           confirmButtonColor: "#2563eb",
         });
       } else {
+        const errorMessage = axiosError.response?.data?.message || axiosError.response?.data?.error || "Không thể tạo yêu cầu đặt cọc";
+        const errorDetail = axiosError.response?.data?.error && axiosError.response.data.error !== errorMessage 
+          ? `<p class="text-xs text-gray-500 mt-2">${axiosError.response.data.error}</p>` 
+          : '';
+        
         Swal.fire({
           icon: "error",
           title: "Lỗi",
           html: `
-            <p>${axiosError.response?.data?.message || axiosError.response?.data?.error || "Không thể tạo yêu cầu đặt cọc"}</p>
-            ${axiosError.response?.data?.error && (
-              `<p class="text-xs text-gray-500 mt-2">${axiosError.response.data.error}</p>`
-            )}
+            <p>${errorMessage}</p>
+            ${errorDetail}
           `,
           confirmButtonColor: "#2563eb",
         });
