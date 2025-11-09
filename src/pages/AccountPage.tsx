@@ -10,6 +10,8 @@ import ListingsTab from "../components/Account/ListingsTab";
 import ChatTab from "../components/Account/ChatTab";
 import FavoritesTab from "../components/Account/FavoritesTab";
 import TransactionsTab from "../components/Account/TransactionsTab";
+import AuctionsTab from "../components/Account/AuctionsTab";
+import AppointmentsTab from "../components/Account/AppointmentsTab";
 
 const AccountPage: React.FC = () => {
   const location = useLocation();
@@ -105,6 +107,12 @@ const AccountPage: React.FC = () => {
 
       case "listings":
         return <ListingsTab />;
+
+      case "auctions":
+        return <AuctionsTab />;
+
+      case "appointments":
+        return <AppointmentsTab />;
 
       case "chat":
         return <ChatTab />;
