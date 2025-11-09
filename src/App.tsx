@@ -33,6 +33,9 @@ import AuctionCreatePage from "./pages/Auction/AuctionCreatePage"; // nếu chư
 
 // 🔽 bọc App bằng SocketProvider để bật realtime
 import { SocketProvider } from "./contexts/SocketContext";
+import MyMembershipPage from "./pages/MyMembershipPage";
+import UpgradeMembershipPage from "./pages/UpgradeMembershipPage";
+import PaymentResultPage from "./pages/PaymentResultPage";
 
 function App() {
   return (
@@ -80,6 +83,15 @@ function App() {
                     <Route path="/ekyc" element={<EkycPage />} />
                     <Route path="/account" element={<AccountPage />} />
                     <Route path="/wallet" element={<WalletPage />} />
+                    <Route path="/membership" element={<MyMembershipPage />} />
+                    <Route
+                      path="/membership/upgrade"
+                      element={<UpgradeMembershipPage />}
+                    />
+                    <Route
+                      path="/membership/payment-result"
+                      element={<PaymentResultPage />}
+                    />
                     <Route
                       path="/notifications-deposit"
                       element={<NotificationDepositPage />}

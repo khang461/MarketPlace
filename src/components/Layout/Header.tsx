@@ -10,7 +10,8 @@ import {
   LogOut,
   Wallet,
   FileText,
-  Gavel, // ✅ NEW
+  Gavel,
+  Crown, // ✅ NEW
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { useAuth } from "../../contexts/AuthContext";
@@ -427,26 +428,34 @@ const Header: React.FC = () => {
                   </div>
                   <Link
                     to="/account"
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
                   >
-                    Tài khoản
+                    <User className="w-4 h-4" />
+                    <span>Tài khoản</span>
                   </Link>
                   <Link
                     to="/wallet"
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
                   >
                     <Wallet className="w-4 h-4" />
                     <span>Ví của tôi</span>
                   </Link>
                   <Link
+                    to="/membership"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <Crown className="w-4 h-4" />
+                    <span>Quản lý gói</span>
+                  </Link>
+                  <Link
                     to="/notifications-deposit"
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2 relative"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2 relative"
                   >
                     <FileText className="w-4 h-4" />
                     <span>Yêu cầu đặt cọc</span>
                     {unreadNotifications > 0 && (
                       <span className="ml-auto bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                        {unreadNotifications > 99 ? "99+" : unreadNotifications}
                       </span>
                     )}
                   </Link>
@@ -565,7 +574,7 @@ const Header: React.FC = () => {
                     <span>Yêu cầu đặt cọc</span>
                     {unreadNotifications > 0 && (
                       <span className="ml-auto bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                        {unreadNotifications > 99 ? "99+" : unreadNotifications}
                       </span>
                     )}
                   </Link>
