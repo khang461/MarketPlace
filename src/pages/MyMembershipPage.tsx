@@ -22,6 +22,9 @@ const MyMembershipPage: React.FC = () => {
   useEffect(() => {
     fetchCurrentMembership();
   }, []);
+  useEffect(() => {
+    console.log("Membership Data:", membership);
+  }, [membership]);
 
   const fetchCurrentMembership = async () => {
     try {
@@ -202,6 +205,7 @@ const MyMembershipPage: React.FC = () => {
 
   const daysRemaining = getDaysRemaining(membership.endDate);
   const packageData = membership.packageId;
+  const isFreePackage = packageData.slug === "free";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8 px-4">
@@ -255,23 +259,32 @@ const MyMembershipPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="bg-white/10 rounded-xl p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <Calendar className="w-5 h-5 text-blue-200" />
-                <p className="text-blue-100 text-sm">Ngày hết hạn</p>
+            {/* Chỉ hiển thị ngày hết hạn nếu KHÔNG phải gói Free */}
+            {!isFreePackage && (
+              <div className="bg-white/10 rounded-xl p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Calendar className="w-5 h-5 text-blue-200" />
+                  <p className="text-blue-100 text-sm">Ngày hết hạn</p>
+                </div>
+                <p className="text-xl font-semibold">
+                  {formatDate(membership.endDate)}
+                </p>
               </div>
-              <p className="text-xl font-semibold">
-                {formatDate(membership.endDate)}
-              </p>
-            </div>
+            )}
 
             <div className="bg-white/10 rounded-xl p-4">
               <div className="flex items-center space-x-2 mb-2">
                 <TrendingUp className="w-5 h-5 text-blue-200" />
-                <p className="text-blue-100 text-sm">Còn lại</p>
+                <p className="text-blue-100 text-sm">
+                  {isFreePackage ? "Thời hạn" : "Còn lại"}
+                </p>
               </div>
               <p className="text-xl font-semibold">
-                {daysRemaining > 0 ? `${daysRemaining} ngày` : "Đã hết hạn"}
+                {isFreePackage
+                  ? "Vĩnh viễn"
+                  : daysRemaining > 0
+                  ? `${daysRemaining} ngày`
+                  : "Đã hết hạn"}
               </p>
             </div>
           </div>
