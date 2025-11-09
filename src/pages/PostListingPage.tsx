@@ -338,8 +338,28 @@ const PostListingPage: React.FC = () => {
           });
 
           if (ask.isConfirmed) {
-            await api.post(`/listings/${editId}/submit`, { commissionTermsAccepted: true });
-            await Swal.fire({ icon: "success", title: "Đã gửi duyệt!", confirmButtonColor: "#2563eb" });
+            if (!editId) {
+              await Swal.fire({
+                icon: "error",
+                title: "Lỗi!",
+                text: "Không tìm thấy ID tin đăng để gửi duyệt.",
+                confirmButtonColor: "#dc2626",
+              });
+              return;
+            }
+            try {
+              await api.post(`/listings/${editId}/submit`, { commissionTermsAccepted: true });
+              await Swal.fire({ icon: "success", title: "Đã gửi duyệt!", confirmButtonColor: "#2563eb" });
+            } catch (error) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const msg = (error as any)?.response?.data?.message || "Không thể gửi duyệt tin đăng.";
+              await Swal.fire({
+                icon: "error",
+                title: "Lỗi gửi duyệt!",
+                text: msg,
+                confirmButtonColor: "#dc2626",
+              });
+            }
           }
 
           navigate("/account");
@@ -401,7 +421,20 @@ const PostListingPage: React.FC = () => {
       // ❗ KHÔNG set Content-Type ở đây (để browser tự set)
       const createResponse = await api.post("/listings", fd);
 
-      listingId = createResponse.data._id;
+      // Lấy listingId từ response (hỗ trợ nhiều cấu trúc response)
+      listingId = createResponse.data?._id || createResponse.data?.data?._id || createResponse.data?.listing?._id || "";
+
+      // Validate listingId
+      if (!listingId) {
+        console.error("Create listing response:", createResponse.data);
+        await Swal.fire({
+          icon: "error",
+          title: "Lỗi tạo tin đăng!",
+          text: "Không nhận được ID tin đăng từ server. Vui lòng thử lại.",
+          confirmButtonColor: "#dc2626",
+        });
+        return;
+      }
 
       const result = await Swal.fire({
         icon: "success",
@@ -422,6 +455,9 @@ const PostListingPage: React.FC = () => {
 
       if (result.isConfirmed) {
         try {
+          if (!listingId) {
+            throw new Error("Không có ID tin đăng để gửi duyệt");
+          }
           await api.post(`/listings/${listingId}/submit`, { commissionTermsAccepted: true });
           await Swal.fire({
             icon: "success",
@@ -437,7 +473,11 @@ const PostListingPage: React.FC = () => {
           navigate("/account");
         }
       } else if (result.isDenied) {
-        navigate(`/vehicle/${listingId}`);
+        if (listingId) {
+          navigate(`/vehicle/${listingId}`);
+        } else {
+          navigate("/account");
+        }
       } else {
         navigate("/account");
       }
