@@ -319,8 +319,8 @@ const NotificationDepositPage: React.FC = () => {
   };
 
   const handleAcceptAppointment = async (e: React.MouseEvent, notification: Notification) => {
-    e.stopPropagation(); // Ngăn chặn event bubble
-    
+    e.stopPropagation();
+  
     if (!notification.metadata?.appointmentId) {
       Swal.fire({
         icon: "error",
@@ -330,7 +330,7 @@ const NotificationDepositPage: React.FC = () => {
       });
       return;
     }
-
+  
     try {
       // Gọi API để xác nhận lịch hẹn
       const response = await api.post(`/appointments/${notification.metadata.appointmentId}/confirm`);
@@ -340,18 +340,27 @@ const NotificationDepositPage: React.FC = () => {
         if (notification?._id) {
           try {
             await api.delete(`/notifications/${notification._id}`);
-            setNotifications(prev => prev.filter(n => n._id !== notification._id));
           } catch (deleteError) {
-            console.error('Error deleting notification:', deleteError);
-            // Vẫn xóa khỏi state để không ảnh hưởng UX
+            // ✅ Xử lý riêng trường hợp 404 (notification đã bị xóa)
+            const axiosError = deleteError as { response?: { status?: number } };
+            if (axiosError.response?.status === 404) {
+              console.log('Notification already deleted');
+            } else {
+              console.error('Error deleting notification:', deleteError);
+            }
+          } finally {
+            // ✅ Luôn xóa khỏi state (dù API thành công hay thất bại)
             setNotifications(prev => prev.filter(n => n._id !== notification._id));
           }
         }
-        
+  
+        // ✅ Refresh danh sách appointments nếu cần
+        // await fetchAppointments(); // Nếu có hàm này
+  
         Swal.fire({
           icon: "success",
           title: "Thành công!",
-          text: "Đã chấp nhận lịch hẹn.",
+          text: response.data.message || "Đã chấp nhận lịch hẹn.",
           confirmButtonColor: "#2563eb",
           timer: 1500,
           showConfirmButton: false,
