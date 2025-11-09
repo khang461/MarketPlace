@@ -10,7 +10,8 @@ import {
   LogOut,
   Wallet,
   FileText,
-  Gavel, // ✅ NEW
+  Gavel,
+  Crown, // ✅ NEW
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { useAuth } from "../../contexts/AuthContext";
@@ -466,14 +467,21 @@ const Header: React.FC = () => {
                   </Link>
                   <Link
                     to="/wallet"
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
                   >
                     <Wallet className="w-4 h-4" />
                     <span>Ví của tôi</span>
                   </Link>
                   <Link
+                    to="/membership"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <Crown className="w-4 h-4" />
+                    <span>Quản lý gói</span>
+                  </Link>
+                  <Link
                     to="/notifications-deposit"
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2 relative"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2 relative"
                   >
                     <FileText className="w-4 h-4" />
                     <span>Yêu cầu đặt cọc</span>
