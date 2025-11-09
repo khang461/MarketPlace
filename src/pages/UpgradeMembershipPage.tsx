@@ -20,6 +20,9 @@ const UpgradeMembershipPage: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, []);
+  useEffect(() => {
+    console.log("Current Membership:", currentMembership);
+  }, [currentMembership]);
 
   const fetchData = async () => {
     try {
@@ -280,14 +283,18 @@ const UpgradeMembershipPage: React.FC = () => {
               </div>
               <div className="text-right">
                 <p className="text-sm text-green-100">Còn lại</p>
-                <p className="text-xl font-bold">
-                  {Math.ceil(
-                    (new Date(currentMembership.endDate).getTime() -
-                      new Date().getTime()) /
-                      (1000 * 60 * 60 * 24)
-                  )}{" "}
-                  ngày
-                </p>
+                {currentMembership.packageId.slug === "free" ? (
+                  <p className="text-xl font-bold">Vĩnh Viễn</p>
+                ) : (
+                  <p className="text-xl font-bold">
+                    {Math.ceil(
+                      (new Date(currentMembership.endDate).getTime() -
+                        new Date().getTime()) /
+                        (1000 * 60 * 60 * 24)
+                    )}{" "}
+                    ngày
+                  </p>
+                )}
               </div>
             </div>
           </div>
