@@ -2,10 +2,10 @@ import React from "react";
 import {
   User,
   Heart,
-  Clock,
   Package,
   Gavel,
   CalendarCheck,
+  Wallet,
 } from "lucide-react";
 
 interface Tab {
@@ -27,7 +27,7 @@ const tabs: Tab[] = [
   { id: "appointments", name: "Lịch hẹn", icon: CalendarCheck },
   // { id: "chat", name: "Tin nhắn", icon: MessageCircle },
   { id: "favorites", name: "Yêu thích", icon: Heart },
-  { id: "transactions", name: "Giao dịch", icon: Clock },
+  { id: "transactions", name: "Giao dịch", icon: Wallet },
 ];
 
 const AccountLayout: React.FC<AccountLayoutProps> = ({
