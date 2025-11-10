@@ -3,17 +3,22 @@ import { Link } from "react-router-dom";
 import type { Auction } from "../../types/auction";
 import { mapAuctionStatus, getHighestBid } from "../../types/auction";
 import AuctionCountdown from "./AuctionCountdown";
+import { getImageUrl } from "../../utils/imageHelper";
 
 export default function AuctionCard({ a }: { a: Auction }) {
-  // Tiêu đề: ưu tiên listing.title, fallback listingId
-  const title =
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (a as any).listing?.title ||
-    (typeof a.listingId === "string" ? a.listingId : "Xem chi tiết");
+  // listingId có thể là object hoặc string, ưu tiên object
+  const listing =
+    typeof a.listingId === "object" ? a.listingId : (a as any).listing;
+
+  // Tiêu đề: từ listing.make + model + year
+  const title = listing
+    ? `${listing.make} ${listing.model} ${listing.year}`
+    : typeof a.listingId === "string"
+    ? a.listingId
+    : "Xem chi tiết";
 
   // Địa điểm: hỗ trợ cả string và object { district, city }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const locationRaw = (a as any).listing?.location;
+  const locationRaw = listing?.location;
   const locationText =
     typeof locationRaw === "string"
       ? locationRaw
@@ -26,15 +31,15 @@ export default function AuctionCard({ a }: { a: Auction }) {
   // Map status API -> UI cho Countdown + badge LIVE
   const uiStatus = mapAuctionStatus(a.status);
 
-  // Prepare listing image: prefer listing.thumbnail, then listing.photos[0].url (Cloudinary)
-  // Put this before return so JSX stays clean
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const listing = (a as any).listing;
-  const listingImage =
+  // Prepare listing image: use getImageUrl helper for consistent URL handling
+  const listingImageRaw =
     listing?.thumbnail ||
-    (Array.isArray(listing?.photos) && listing.photos[0]?.url) ||
-    (Array.isArray(listing?.photos) && listing.photos[0]?.secure_url) ||
+    (Array.isArray(listing?.photos) && listing.photos[0]) ||
     undefined;
+
+  const listingImage = listingImageRaw
+    ? getImageUrl(listingImageRaw)
+    : undefined;
 
   return (
     <Link

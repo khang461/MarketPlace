@@ -15,6 +15,7 @@ import CreateAppointmentButton from "../../components/Auction/CreateAppointmentB
 import { useSocket } from "../../contexts/SocketContext";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../config/api";
+import { getImageUrl } from "../../utils/imageHelper";
 
 /** =================== Utils =================== */
 type UIStatus = "PENDING" | "RUNNING" | "ENDED";
@@ -53,7 +54,9 @@ function safeText(val: unknown): string {
 }
 
 const fmtVND = (n?: number) =>
-  typeof n === "number" && !Number.isNaN(n) ? n.toLocaleString("vi-VN") + "₫" : "0₫";
+  typeof n === "number" && !Number.isNaN(n)
+    ? n.toLocaleString("vi-VN") + "₫"
+    : "0₫";
 
 const StatusBadge = ({ status }: { status: UIStatus | "ENDED" }) => {
   const map: Record<string, string> = {
@@ -62,9 +65,15 @@ const StatusBadge = ({ status }: { status: UIStatus | "ENDED" }) => {
     ENDED: "bg-gray-200 text-gray-700 border border-gray-300",
   };
   const label =
-    status === "RUNNING" ? "Đang diễn ra" : status === "ENDED" ? "Đã kết thúc" : "Sắp diễn ra";
+    status === "RUNNING"
+      ? "Đang diễn ra"
+      : status === "ENDED"
+      ? "Đã kết thúc"
+      : "Sắp diễn ra";
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${map[status]}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${map[status]}`}
+    >
       {label}
     </span>
   );
@@ -80,6 +89,7 @@ export default function AuctionDetailPage() {
   const [sellerId, setSellerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sellerIdLoaded, setSellerIdLoaded] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // dùng để yêu cầu BidBox re-check trạng thái cọc sau khi DepositButton thay đổi
   const [depVersion, setDepVersion] = useState(0);
@@ -201,30 +211,40 @@ export default function AuctionDetailPage() {
     return Math.max(bmax, auction.startingPrice || 0);
   }, [auction]);
 
-  const title =
-    (auction as any)?.listing?.title ??
-    (typeof auction?.listingId === "string"
-      ? auction?.listingId
-      : "Chi tiết phiên đấu giá");
+  // Get listing from auction (listingId can be object or string)
+  const listing =
+    auction && typeof auction.listingId === "object"
+      ? auction.listingId
+      : (auction as any)?.listing;
+
+  // Title from listing make + model + year
+  const title = listing
+    ? `${listing.make} ${listing.model} ${listing.year}`
+    : typeof auction?.listingId === "string"
+    ? auction.listingId
+    : "Chi tiết phiên đấu giá";
 
   const locationText =
-    typeof (auction as any)?.listing?.location === "string"
-      ? (auction as any)?.listing?.location
-      : [
-          (auction as any)?.listing?.location?.district,
-          (auction as any)?.listing?.location?.city,
-        ]
+    typeof listing?.location === "string"
+      ? listing.location
+      : [listing?.location?.district, listing?.location?.city]
           .filter(Boolean)
           .join(", ");
 
-  // Prefer listing.thumbnail, then listing.photos[0].url (Cloudinary), then any images[] fallback
-  const rawListing = (auction as any)?.listing;
+  // Get all photos for gallery
+  const photos = Array.isArray(listing?.photos) ? listing.photos : [];
+
+  // Get hero image using getImageUrl helper for consistent URL handling
   const heroThumb =
-    rawListing?.thumbnail ||
-    (Array.isArray(rawListing?.photos) && rawListing.photos[0]?.url) ||
-    (Array.isArray(rawListing?.photos) && rawListing.photos[0]?.secure_url) ||
-    rawListing?.images?.[0] ||
-    undefined;
+    photos.length > 0 ? getImageUrl(photos[currentImageIndex]) : undefined;
+
+  const nextImage = () => {
+    setCurrentImageIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+  };
+
+  const previousImage = () => {
+    setCurrentImageIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
+  };
 
   const winnerBid = useMemo(() => topBid(auction), [auction]);
 
@@ -273,8 +293,9 @@ export default function AuctionDetailPage() {
   useEffect(() => {
     if (!confirmedDeposit) return;
     const id = requestAnimationFrame(() => {
-      const btn =
-        depositWrapRef.current?.querySelector<HTMLButtonElement>("button, [role='button']");
+      const btn = depositWrapRef.current?.querySelector<HTMLButtonElement>(
+        "button, [role='button']"
+      );
       btn?.click?.(); // auto click 1 lần; nếu bị chặn, người dùng bấm thủ công
     });
     return () => cancelAnimationFrame(id);
@@ -333,6 +354,44 @@ export default function AuctionDetailPage() {
                 Không có ảnh
               </div>
             )}
+
+            {/* Navigation buttons */}
+            {photos.length > 1 && (
+              <>
+                <button
+                  onClick={previousImage}
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
+                  aria-label="Ảnh trước"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="w-5 h-5"
+                  >
+                    <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={nextImage}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
+                  aria-label="Ảnh tiếp theo"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="w-5 h-5"
+                  >
+                    <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" />
+                  </svg>
+                </button>
+                <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+                  {currentImageIndex + 1} / {photos.length}
+                </div>
+              </>
+            )}
+
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/0" />
             <div className="absolute bottom-3 left-3 right-3">
               <div className="flex items-center gap-2">
@@ -354,6 +413,29 @@ export default function AuctionDetailPage() {
             </div>
           </div>
 
+          {/* Thumbnail Navigation */}
+          {photos.length > 1 && (
+            <div className="p-4 flex space-x-2 overflow-x-auto bg-gray-50">
+              {photos.map((photo: any, index: number) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentImageIndex(index)}
+                  className={`flex-shrink-0 w-20 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                    index === currentImageIndex
+                      ? "border-blue-600 ring-2 ring-blue-200"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <img
+                    src={getImageUrl(photo)}
+                    alt={`${safeText(title)} ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Price strip */}
           <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3 border-t">
             <div className="rounded-lg bg-gray-50 p-3">
@@ -364,7 +446,9 @@ export default function AuctionDetailPage() {
             </div>
             <div className="rounded-lg bg-gray-50 p-3">
               <div className="text-xs text-gray-500">Giá hiện tại</div>
-              <div className="font-semibold text-lg">{fmtVND(currentPrice)}</div>
+              <div className="font-semibold text-lg">
+                {fmtVND(currentPrice)}
+              </div>
             </div>
             <div className="rounded-lg bg-gray-50 p-3">
               <div className="text-xs text-gray-500">Lượt đặt giá</div>
@@ -424,7 +508,9 @@ export default function AuctionDetailPage() {
             </div>
             <div className="rounded-lg bg-gray-50 p-3">
               <div className="text-xs text-gray-500">Giá hiện tại</div>
-              <div className="font-semibold text-lg">{fmtVND(currentPrice)}</div>
+              <div className="font-semibold text-lg">
+                {fmtVND(currentPrice)}
+              </div>
             </div>
           </div>
         </div>
@@ -444,15 +530,20 @@ export default function AuctionDetailPage() {
         {/* Actions */}
         <div className="rounded-2xl border bg-white shadow-sm p-4 space-y-3">
           {!sellerIdLoaded ? (
-            <div className="p-3 text-center text-gray-500">Đang kiểm tra quyền...</div>
+            <div className="p-3 text-center text-gray-500">
+              Đang kiểm tra quyền...
+            </div>
           ) : !isSeller ? (
             <>
               {/* Hiển thị giá đặt cọc */}
               <div className="rounded-lg bg-gray-50 p-3 border">
                 <div className="text-xs text-gray-500">Giá đặt cọc</div>
-                <div className="text-lg font-semibold">{fmtVND(depositAmount)}</div>
+                <div className="text-lg font-semibold">
+                  {fmtVND(depositAmount)}
+                </div>
                 <div className="text-xs text-gray-500 mt-1">
-                  Số tiền sẽ được hoàn lại theo chính sách nếu phiên không thành công hoặc bạn không thắng (tuỳ điều khoản).
+                  Số tiền sẽ được hoàn lại theo chính sách nếu phiên không thành
+                  công hoặc bạn không thắng (tuỳ điều khoản).
                 </div>
               </div>
 
@@ -471,7 +562,10 @@ export default function AuctionDetailPage() {
                 <div className="rounded-lg border p-3">
                   <div className="text-sm mb-2">
                     Đang xử lý đặt cọc {fmtVND(depositAmount)}…
-                    <span className="text-gray-500"> (nếu chưa thấy gì, vui lòng bấm nút bên dưới)</span>
+                    <span className="text-gray-500">
+                      {" "}
+                      (nếu chưa thấy gì, vui lòng bấm nút bên dưới)
+                    </span>
                   </div>
                   <div ref={depositWrapRef} className="inline-flex">
                     <DepositButton
@@ -533,7 +627,8 @@ export default function AuctionDetailPage() {
 
           {!isConnected && (
             <div className="text-xs text-amber-600">
-              Mất kết nối realtime — trang vẫn hoạt động nhưng không tự cập nhật. Hãy tải lại nếu cần.
+              Mất kết nối realtime — trang vẫn hoạt động nhưng không tự cập
+              nhật. Hãy tải lại nếu cần.
             </div>
           )}
         </div>
@@ -614,7 +709,8 @@ function ResultPanel({
               </b>{" "}
               với mức <b>{fmtVND(winnerBid.price)}</b>.
               <br />
-              Vui lòng chờ người mua tạo lịch hẹn và xác nhận để hoàn tất giao dịch.
+              Vui lòng chờ người mua tạo lịch hẹn và xác nhận để hoàn tất giao
+              dịch.
             </div>
           )}
         </>
@@ -649,14 +745,17 @@ function ConfirmDepositModal({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[100]">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+        onClick={onClose}
+      />
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <div className="w-full max-w-md rounded-2xl bg-white shadow-xl ring-1 ring-black/5">
           <div className="p-5">
             <h3 className="text-lg font-semibold">Xác nhận đặt cọc</h3>
             <p className="mt-2 text-sm text-gray-600">
-              Bạn sẽ đặt cọc <b>{fmtVND(amount)}</b> để tham gia phiên đấu giá này.
-              Bạn có chắc muốn tiếp tục không?
+              Bạn sẽ đặt cọc <b>{fmtVND(amount)}</b> để tham gia phiên đấu giá
+              này. Bạn có chắc muốn tiếp tục không?
             </p>
           </div>
           <div className="px-5 pb-5 flex items-center justify-end gap-2">
