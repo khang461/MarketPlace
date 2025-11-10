@@ -58,7 +58,7 @@ const HomePage: React.FC = () => {
             page: "1",
             limit: "3",
             sortBy: "newest",
-            condition: "New",
+            status: "Published", // Chỉ lấy sản phẩm còn hàng
           },
         });
 
@@ -74,12 +74,9 @@ const HomePage: React.FC = () => {
             mileage: listing.mileageKm,
             batteryHealth: Math.max(80, 100 - listing.chargeCycles / 20),
             location: `${listing.location.district}, ${listing.location.city}`,
-            images: listing.photos.map((p) => `http://localhost:8081${p.url}`),
+            images: listing.photos,
             postedDate: listing.createdAt,
-            status:
-              listing.condition === "LikeNew"
-                ? "available"
-                : listing.status.toLowerCase(),
+            status: listing.status,
             sellerId: listing.sellerId._id,
             isFeatured: true,
           })
@@ -117,12 +114,9 @@ const HomePage: React.FC = () => {
             mileage: listing.mileageKm,
             batteryHealth: Math.max(80, 100 - listing.chargeCycles / 20),
             location: `${listing.location.district}, ${listing.location.city}`,
-            images: listing.photos.map((p) => `http://localhost:8081${p.url}`),
+            images: listing.photos,
             postedDate: listing.createdAt,
-            status:
-              listing.condition === "LikeNew"
-                ? "available"
-                : listing.status.toLowerCase(),
+            status: listing.status,
             sellerId: listing.sellerId._id,
             isFeatured: false,
           })
