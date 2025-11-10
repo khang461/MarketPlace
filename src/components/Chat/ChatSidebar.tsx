@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MessageCircle, Search, Circle, Trash2 } from "lucide-react";
 import api from "../../config/api";
-import { Chat } from "../../types/chat";
+import { Chat, Message } from "../../types/chat";
 import Swal from "sweetalert2";
+import { useSocket } from "../../contexts/SocketContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 const ChatSidebar: React.FC = () => {
   const [chats, setChats] = useState<Chat[]>([]);
@@ -11,10 +13,61 @@ const ChatSidebar: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
   const { chatId } = useParams<{ chatId: string }>();
+  const { socket } = useSocket();
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchChats();
   }, []);
+
+  // WebSocket listener for new messages - update sidebar
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewMessage = (message: Message) => {
+      console.log("📬 Sidebar received new message:", message);
+
+      // Update the chat list with new last message
+      setChats((prevChats) => {
+        return prevChats
+          .map((chat) => {
+            if (chat._id === message.chatId) {
+              return {
+                ...chat,
+                lastMessage: {
+                  content: message.content,
+                  senderId: message.senderId,
+                  timestamp: message.createdAt || new Date().toISOString(),
+                },
+                lastMessageAt: message.createdAt || new Date().toISOString(),
+                // Increment unread count if not the current chat and not sent by me
+                unreadCount:
+                  message.chatId !== chatId && message.senderId._id !== user?.id
+                    ? (chat.unreadCount || 0) + 1
+                    : chat.unreadCount,
+              };
+            }
+            return chat;
+          })
+          .sort((a, b) => {
+            // Sort by last message time (most recent first)
+            const timeA = new Date(
+              a.lastMessageAt || a.updatedAt || 0
+            ).getTime();
+            const timeB = new Date(
+              b.lastMessageAt || b.updatedAt || 0
+            ).getTime();
+            return timeB - timeA;
+          });
+      });
+    };
+
+    socket.on("new_message", handleNewMessage);
+
+    return () => {
+      socket.off("new_message", handleNewMessage);
+    };
+  }, [socket, chatId, user?.id]);
 
   const fetchChats = async () => {
     try {
@@ -195,7 +248,10 @@ const ChatSidebar: React.FC = () => {
                     : "hover:bg-gray-50"
                 }`}
               >
-                <div className="flex items-start gap-3" onClick={() => handleChatClick(chat)}>
+                <div
+                  className="flex items-start gap-3"
+                  onClick={() => handleChatClick(chat)}
+                >
                   {/* Avatar */}
                   <div className="relative flex-shrink-0">
                     <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">

@@ -97,28 +97,11 @@ const ChatDetailPage: React.FC = () => {
       if (message.senderId._id !== user?.id) {
         markMessagesAsRead();
 
-        // Show notification using NotificationManager
-        const senderName =
-          typeof message.senderId === "object"
-            ? message.senderId.fullName
-            : "Người dùng";
-
-        const senderAvatar =
-          typeof message.senderId === "object"
-            ? message.senderId.avatar
-            : undefined;
-
-        NotificationManager.showMessageNotification(
-          senderName,
-          message.content,
-          {
-            avatar: senderAvatar,
-            chatId: chatId,
-            onlyWhenHidden: true,
-            onClick: () => {
-              window.focus();
-            },
-          }
+        // KHÔNG hiển thị notification khi đang xem chính chat đó
+        // Chỉ hiển thị khi message từ chat khác hoặc khi tab bị ẩn
+        // Vì đang ở trong ChatDetailPage với chatId này rồi, không cần notification
+        console.log(
+          "✅ Message marked as read (no notification - already in chat)"
         );
       }
     });
@@ -228,6 +211,8 @@ const ChatDetailPage: React.FC = () => {
       setIsLoading(true);
       const response = await api.get(`/chat/${chatId}/messages`);
 
+      console.log("📨 Messages API response:", response.data);
+
       // Kiểm tra nếu response có chat info
       if (response.data && Array.isArray(response.data)) {
         setMessages(response.data);
@@ -239,6 +224,7 @@ const ChatDetailPage: React.FC = () => {
         // Nếu API trả về object có messages và chat info
         setMessages(response.data.messages);
         if (response.data.chat) {
+          console.log("📦 Chat info from messages API:", response.data.chat);
           setChat(response.data.chat);
         } else if (!chat) {
           // Fallback: fetch chat info nếu không có
@@ -262,8 +248,10 @@ const ChatDetailPage: React.FC = () => {
     try {
       // Fetch chat info from chat list endpoint
       const response = await api.get("/chat");
+      console.log("📋 Chat list API response:", response.data);
       const chats = response.data?.chats || response.data || [];
       const currentChat = chats.find((c: Chat) => c._id === chatId);
+      console.log("🎯 Found current chat from list:", currentChat);
       if (currentChat) {
         setChat(currentChat);
       }
@@ -871,10 +859,23 @@ const ChatDetailPage: React.FC = () => {
   }
 
   // API mới trả về otherUser và listing trực tiếp
+  // Fix: Đảm bảo lấy đúng người dùng khác (không phải mình)
   const otherUser =
     chat.otherUser ||
-    (chat.buyerId?._id === user?.id ? chat.sellerId : chat.buyerId);
+    (chat.buyerId?._id === user?.id ? chat.sellerId : chat.buyerId) ||
+    (chat.sellerId?._id === user?.id ? chat.buyerId : chat.sellerId);
   const listing = chat.listing || chat.listingId;
+
+  console.log("🔍 Chat Debug:", {
+    chatId: chat._id,
+    currentUserId: user?.id,
+    buyerId: chat.buyerId?._id,
+    buyerName: chat.buyerId?.fullName,
+    sellerId: chat.sellerId?._id,
+    sellerName: chat.sellerId?.fullName,
+    otherUserFromAPI: chat.otherUser?.fullName,
+    calculatedOtherUser: otherUser?.fullName,
+  });
 
   // Kiểm tra xem otherUser có online không
   const isOtherUserOnline =

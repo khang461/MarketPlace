@@ -30,11 +30,12 @@ export interface Vehicle {
   sellerRating: number;
   location: string;
   postedDate: string;
-  category: 'car' | 'battery';
+  category: 'car' | 'battery' | 'xe-dien' | 'pin';
   batteryCapacity?: number;
   batteryCondition?: string;
+  batteryHealth?: number;
   isFeatured: boolean;
-  status: 'available' | 'sold' | 'pending';
+  status: 'Published' | 'InTransaction' | 'Sold' | 'Draft' | 'PendingReview' | 'available' | 'sold' | 'pending';
 }
 
 export interface Review {

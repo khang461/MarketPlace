@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Shield,
   CheckCircle,
+  XCircle,
 } from "lucide-react";
 import api from "../config/api";
 import { getImageUrl } from "../utils/imageHelper";
@@ -179,12 +180,18 @@ const VehicleDetailPage: React.FC = () => {
       title: "Số dư không đủ",
       html: `
         <div class="text-left space-y-2">
-          <p>Tổng tiền cần đặt cọc: <strong class="text-blue-600">${formatPrice(requiredAmount)}</strong></p>
+          <p>Tổng tiền cần đặt cọc: <strong class="text-blue-600">${formatPrice(
+            requiredAmount
+          )}</strong></p>
           <p>Số dư hiện tại: <strong>${formatPrice(currentBalance)}</strong></p>
           <div class="border-b pb-2 mb-2">
-            <p class="text-lg font-semibold text-orange-600">Bạn chỉ cần nạp thêm: <strong>${formatPrice(missingAmount)}</strong></p>
+            <p class="text-lg font-semibold text-orange-600">Bạn chỉ cần nạp thêm: <strong>${formatPrice(
+              missingAmount
+            )}</strong></p>
           </div>
-          <p class="mt-3 text-gray-600">Bạn có muốn nạp trực tiếp <strong>${formatPrice(missingAmount)}</strong> vào ví để đặt cọc không?</p>
+          <p class="mt-3 text-gray-600">Bạn có muốn nạp trực tiếp <strong>${formatPrice(
+            missingAmount
+          )}</strong> vào ví để đặt cọc không?</p>
         </div>
       `,
       showCancelButton: true,
@@ -223,7 +230,9 @@ const VehicleDetailPage: React.FC = () => {
     const { value: depositAmount } = await Swal.fire({
       title: "Đặt cọc",
       html: `
-        <p class="text-left mb-4">Giá xe: <strong>${formatPrice(listing.priceListed)}</strong></p>
+        <p class="text-left mb-4">Giá xe: <strong>${formatPrice(
+          listing.priceListed
+        )}</strong></p>
         <label class="block text-left mb-2">Số tiền đặt cọc (VND):</label>
         <input 
           id="depositAmount" 
@@ -233,22 +242,30 @@ const VehicleDetailPage: React.FC = () => {
           min="${Math.round(listing.priceListed * 0.1)}" 
           step="100000"
         />
-        <p class="text-left mt-2 text-sm text-gray-500">Số tiền tối thiểu: ${formatPrice(Math.round(listing.priceListed * 0.1))} (10% giá xe)</p>
+        <p class="text-left mt-2 text-sm text-gray-500">Số tiền tối thiểu: ${formatPrice(
+          Math.round(listing.priceListed * 0.1)
+        )} (10% giá xe)</p>
       `,
       confirmButtonText: "Xác nhận",
       cancelButtonText: "Hủy",
       showCancelButton: true,
       preConfirm: () => {
-        const amount = (document.getElementById('depositAmount') as HTMLInputElement).value;
+        const amount = (
+          document.getElementById("depositAmount") as HTMLInputElement
+        ).value;
         const minAmount = Math.round(listing.priceListed * 0.1); // 10% giá xe
         if (!amount || parseInt(amount) < minAmount) {
-          Swal.showValidationMessage(`Số tiền phải lớn hơn hoặc bằng ${formatPrice(minAmount)} (10% giá xe)`);
+          Swal.showValidationMessage(
+            `Số tiền phải lớn hơn hoặc bằng ${formatPrice(
+              minAmount
+            )} (10% giá xe)`
+          );
           return false;
         }
         return parseInt(amount);
-      }
+      },
     });
-    
+
     if (!depositAmount) return;
 
     setIsDepositing(true);
@@ -271,13 +288,14 @@ const VehicleDetailPage: React.FC = () => {
         // Số dư không đủ, BE trả về URL VNPay để nạp tiền
         const requiredAmount = response.data.requiredAmount || 0;
         const currentBalance = response.data.currentBalance || 0;
-        const missingAmount = response.data.missingAmount || (requiredAmount - currentBalance);
-        
+        const missingAmount =
+          response.data.missingAmount || requiredAmount - currentBalance;
+
         showInsufficientBalanceDialog(
           requiredAmount,
           currentBalance,
           missingAmount,
-          response.data.vnpayUrl || ''
+          response.data.vnpayUrl || ""
         );
       } else {
         // Lỗi khác
@@ -291,22 +309,37 @@ const VehicleDetailPage: React.FC = () => {
     } catch (error: unknown) {
       console.error("Error creating deposit:", error);
       const axiosError = error as {
-        response?: { data?: { message?: string; error?: string; vnpayUrl?: string; requiredAmount?: number; currentBalance?: number; missingAmount?: number } };
+        response?: {
+          data?: {
+            message?: string;
+            error?: string;
+            vnpayUrl?: string;
+            requiredAmount?: number;
+            currentBalance?: number;
+            missingAmount?: number;
+          };
+        };
       };
 
       // Kiểm tra nếu có vnpayUrl trong response lỗi
       if (axiosError.response?.data?.vnpayUrl) {
         const requiredAmount = axiosError.response.data.requiredAmount || 0;
         const currentBalance = axiosError.response.data.currentBalance || 0;
-        const missingAmount = axiosError.response.data.missingAmount || (requiredAmount - currentBalance);
-        
+        const missingAmount =
+          axiosError.response.data.missingAmount ||
+          requiredAmount - currentBalance;
+
         showInsufficientBalanceDialog(
           requiredAmount,
           currentBalance,
           missingAmount,
           axiosError.response.data.vnpayUrl || ""
         );
-      } else if (axiosError.response?.data?.error?.includes("freezeAmount is not a function")) {
+      } else if (
+        axiosError.response?.data?.error?.includes(
+          "freezeAmount is not a function"
+        )
+      ) {
         // Lỗi backend - walletService không có freezeAmount function
         Swal.fire({
           icon: "error",
@@ -318,11 +351,16 @@ const VehicleDetailPage: React.FC = () => {
           confirmButtonColor: "#2563eb",
         });
       } else {
-        const errorMessage = axiosError.response?.data?.message || axiosError.response?.data?.error || "Không thể tạo yêu cầu đặt cọc";
-        const errorDetail = axiosError.response?.data?.error && axiosError.response.data.error !== errorMessage 
-          ? `<p class="text-xs text-gray-500 mt-2">${axiosError.response.data.error}</p>` 
-          : '';
-        
+        const errorMessage =
+          axiosError.response?.data?.message ||
+          axiosError.response?.data?.error ||
+          "Không thể tạo yêu cầu đặt cọc";
+        const errorDetail =
+          axiosError.response?.data?.error &&
+          axiosError.response.data.error !== errorMessage
+            ? `<p class="text-xs text-gray-500 mt-2">${axiosError.response.data.error}</p>`
+            : "";
+
         Swal.fire({
           icon: "error",
           title: "Lỗi",
@@ -553,19 +591,43 @@ const VehicleDetailPage: React.FC = () => {
                     Đang bán
                   </span>
                 )}
+                {listing.status === "InTransaction" && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                    <Shield className="w-3 h-3 mr-1" />
+                    Đang giao dịch
+                  </span>
+                )}
+                {listing.status === "Sold" && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    <XCircle className="w-3 h-3 mr-1" />
+                    Đã bán
+                  </span>
+                )}
               </div>
 
               <div className="space-y-3">
-                <button 
+                <button
                   onClick={handleDeposit}
-                  disabled={isDepositing}
+                  disabled={
+                    isDepositing ||
+                    listing.status === "Sold" ||
+                    listing.status === "InTransaction"
+                  }
                   className={`w-full py-3 rounded-lg font-semibold transition-colors ${
-                    isDepositing
-                      ? "bg-blue-400 text-white cursor-wait opacity-80"
+                    isDepositing ||
+                    listing.status === "Sold" ||
+                    listing.status === "InTransaction"
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                       : "bg-blue-600 text-white hover:bg-blue-700"
                   }`}
                 >
-                  {isDepositing ? "Đang đặt cọc..." : "Đặt cọc"}
+                  {isDepositing
+                    ? "Đang đặt cọc..."
+                    : listing.status === "Sold"
+                    ? "Đã bán"
+                    : listing.status === "InTransaction"
+                    ? "Đang giao dịch"
+                    : "Đặt cọc"}
                 </button>
                 <button className="w-full border border-blue-600 text-blue-600 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2">
                   <Heart className="w-4 h-4" />
@@ -612,7 +674,6 @@ const VehicleDetailPage: React.FC = () => {
               {/* Chỉ hiển thị contact buttons nếu KHÔNG phải tin đăng của mình */}
               {user?.id !== listing.sellerId._id && (
                 <div className="space-y-3">
-                 
                   <button
                     onClick={handleStartChat}
                     className="w-full border border-green-600 text-green-600 py-3 rounded-lg font-semibold hover:bg-green-50 transition-colors flex items-center justify-center space-x-2"
@@ -626,14 +687,16 @@ const VehicleDetailPage: React.FC = () => {
               {/* Hiển thị badge nếu là tin đăng của mình */}
               {user?.id === listing.sellerId._id && (
                 <div className="text-center">
-                  <p className="text-blue-800 font-medium mb-2">Đây là tin đăng của bạn</p>
+                  <p className="text-blue-800 font-medium mb-2">
+                    Đây là tin đăng của bạn
+                  </p>
                   <button
-                  onClick={() =>
-                    navigate("/account", { state: { activeTab: "listings" } })
-                  }
-                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                    onClick={() =>
+                      navigate("/account", { state: { activeTab: "listings" } })
+                    }
+                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
                   >
-                  Quản lý tin đăng
+                    Quản lý tin đăng
                   </button>
                 </div>
               )}
