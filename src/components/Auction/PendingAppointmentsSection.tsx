@@ -4,6 +4,7 @@ import {
   getWonAuctionsPendingAppointment,
   type WonAuctionPendingAppointment,
 } from "../../config/auctionAPI";
+import { getImageUrl } from "../../utils/imageHelper";
 import { Trophy, Calendar, ChevronRight } from "lucide-react";
 
 export default function PendingAppointmentsSection() {
@@ -93,13 +94,7 @@ export default function PendingAppointmentsSection() {
               {/* Vehicle Image */}
               <div className="flex-shrink-0">
                 <img
-                  src={
-                    typeof auction.listingId.photos?.[0] === "string"
-                      ? auction.listingId.photos[0]
-                      : auction.listingId.photos?.[0]?.url
-                      ? `http://localhost:8081${auction.listingId.photos[0].url}`
-                      : "/placeholder-car.jpg"
-                  }
+                  src={getImageUrl(auction.listingId.photos?.[0])}
                   alt={`${auction.listingId.make} ${auction.listingId.model}`}
                   className="w-24 h-24 object-cover rounded-lg"
                 />

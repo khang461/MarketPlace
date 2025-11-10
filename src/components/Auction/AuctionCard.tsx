@@ -26,6 +26,16 @@ export default function AuctionCard({ a }: { a: Auction }) {
   // Map status API -> UI cho Countdown + badge LIVE
   const uiStatus = mapAuctionStatus(a.status);
 
+  // Prepare listing image: prefer listing.thumbnail, then listing.photos[0].url (Cloudinary)
+  // Put this before return so JSX stays clean
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const listing = (a as any).listing;
+  const listingImage =
+    listing?.thumbnail ||
+    (Array.isArray(listing?.photos) && listing.photos[0]?.url) ||
+    (Array.isArray(listing?.photos) && listing.photos[0]?.secure_url) ||
+    undefined;
+
   return (
     <Link
       to={`/auctions/${a._id}`}
@@ -34,17 +44,14 @@ export default function AuctionCard({ a }: { a: Auction }) {
     >
       {/* Media */}
       <div className="relative aspect-[16/9] overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
-        {(a as any).listing?.thumbnail && (
+        {listingImage ? (
           <img
-            src={(a as any).listing.thumbnail}
+            src={listingImage}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
             alt={title}
             loading="lazy"
           />
-        )}
-
-        {/* Gradient overlay for better text contrast */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent" />
+        ) : null}
 
         {/* LIVE badge */}
         {uiStatus === "RUNNING" && (
