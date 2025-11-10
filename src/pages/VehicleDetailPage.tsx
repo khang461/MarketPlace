@@ -56,6 +56,7 @@ const VehicleDetailPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [isDepositing, setIsDepositing] = useState(false);
 
   useEffect(() => {
     const fetchListingDetail = async () => {
@@ -199,6 +200,8 @@ const VehicleDetailPage: React.FC = () => {
   };
 
   const handleDeposit = async () => {
+    if (isDepositing) return;
+
     if (!isAuthenticated) {
       Swal.fire({
         icon: "warning",
@@ -247,6 +250,8 @@ const VehicleDetailPage: React.FC = () => {
     });
     
     if (!depositAmount) return;
+
+    setIsDepositing(true);
 
     // Gọi API đặt cọc
     try {
@@ -328,6 +333,8 @@ const VehicleDetailPage: React.FC = () => {
           confirmButtonColor: "#2563eb",
         });
       }
+    } finally {
+      setIsDepositing(false);
     }
   };
 
@@ -551,9 +558,14 @@ const VehicleDetailPage: React.FC = () => {
               <div className="space-y-3">
                 <button 
                   onClick={handleDeposit}
-                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                  disabled={isDepositing}
+                  className={`w-full py-3 rounded-lg font-semibold transition-colors ${
+                    isDepositing
+                      ? "bg-blue-400 text-white cursor-wait opacity-80"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
                 >
-                  Đặt cọc
+                  {isDepositing ? "Đang đặt cọc..." : "Đặt cọc"}
                 </button>
                 <button className="w-full border border-blue-600 text-blue-600 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2">
                   <Heart className="w-4 h-4" />

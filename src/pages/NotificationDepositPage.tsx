@@ -129,6 +129,11 @@ const NotificationDepositPage: React.FC = () => {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [acceptingById, setAcceptingById] = useState<Record<string, boolean>>({});
+  const [rejectingById, setRejectingById] = useState<Record<string, boolean>>({});
+  const [creatingApptById, setCreatingApptById] = useState<Record<string, boolean>>({});
+  const [acceptingApptById, setAcceptingApptById] = useState<Record<string, boolean>>({});
+  const [rejectingApptById, setRejectingApptById] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -209,6 +214,9 @@ const NotificationDepositPage: React.FC = () => {
     e.stopPropagation(); // Ngăn chặn event bubble
     if (!notification.depositId) return;
 
+    if (acceptingById[notification._id]) return;
+    setAcceptingById(prev => ({ ...prev, [notification._id]: true }));
+
     console.log('[handleAcceptDeposit] Starting accept deposit for notification:', notification._id);
     console.log('[handleAcceptDeposit] Current notification state:', notification);
 
@@ -263,12 +271,17 @@ const NotificationDepositPage: React.FC = () => {
         text: axiosError.response?.data?.message || "Không thể chấp nhận yêu cầu đặt cọc. Vui lòng thử lại sau.",
         confirmButtonColor: "#2563eb",
       });
+    } finally {
+      setAcceptingById(prev => ({ ...prev, [notification._id]: false }));
     }
   };
 
   const handleRejectDeposit = async (e: React.MouseEvent, notification: Notification) => {
     e.stopPropagation(); // Ngăn chặn event bubble
     if (!notification.depositId) return;
+
+    if (rejectingById[notification._id]) return;
+    setRejectingById(prev => ({ ...prev, [notification._id]: true }));
 
     try {
       // Gọi API để từ chối đặt cọc với action REJECT
@@ -315,6 +328,8 @@ const NotificationDepositPage: React.FC = () => {
         text: axiosError.response?.data?.message || "Không thể từ chối yêu cầu đặt cọc. Vui lòng thử lại sau.",
         confirmButtonColor: "#2563eb",
       });
+    } finally {
+      setRejectingById(prev => ({ ...prev, [notification._id]: false }));
     }
   };
 
@@ -331,6 +346,9 @@ const NotificationDepositPage: React.FC = () => {
       return;
     }
   
+    if (acceptingApptById[notification._id]) return;
+    setAcceptingApptById(prev => ({ ...prev, [notification._id]: true }));
+
     try {
       // Gọi API để xác nhận lịch hẹn
       const response = await api.post(`/appointments/${notification.metadata.appointmentId}/confirm`);
@@ -382,6 +400,8 @@ const NotificationDepositPage: React.FC = () => {
         text: axiosError.response?.data?.message || "Không thể chấp nhận lịch hẹn. Vui lòng thử lại sau.",
         confirmButtonColor: "#2563eb",
       });
+    } finally {
+      setAcceptingApptById(prev => ({ ...prev, [notification._id]: false }));
     }
   };
 
@@ -426,11 +446,23 @@ const NotificationDepositPage: React.FC = () => {
 
     // Nếu chọn "Yêu cầu đặt lịch lại"
     if (action === true) {
-      await handleRejectAppointmentRequest(notification);
+      if (rejectingApptById[notification._id]) return;
+      setRejectingApptById(prev => ({ ...prev, [notification._id]: true }));
+      try {
+        await handleRejectAppointmentRequest(notification);
+      } finally {
+        setRejectingApptById(prev => ({ ...prev, [notification._id]: false }));
+      }
     }
     // Nếu chọn "Hủy giao dịch và hoàn tiền"
     else if (action === false) {
-      await handleCancelAppointment(notification);
+      if (rejectingApptById[notification._id]) return;
+      setRejectingApptById(prev => ({ ...prev, [notification._id]: true }));
+      try {
+        await handleCancelAppointment(notification);
+      } finally {
+        setRejectingApptById(prev => ({ ...prev, [notification._id]: false }));
+      }
     }
   };
 
@@ -646,7 +678,10 @@ const NotificationDepositPage: React.FC = () => {
       return;
     }
   
-    const today = new Date();
+  if (creatingApptById[notification._id]) return;
+  setCreatingApptById(prev => ({ ...prev, [notification._id]: true }));
+
+  const today = new Date();
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
@@ -825,6 +860,8 @@ const NotificationDepositPage: React.FC = () => {
         text: axiosError.response?.data?.message || "Không thể tạo lịch hẹn. Vui lòng thử lại sau.",
         confirmButtonColor: "#2563eb",
       });
+    } finally {
+      setCreatingApptById(prev => ({ ...prev, [notification._id]: false }));
     }
   };
 
@@ -949,23 +986,26 @@ const NotificationDepositPage: React.FC = () => {
                           {notification.isAccepted ? (
                             <button
                               onClick={(e) => handleCreateAppointment(e, notification)}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                              disabled={creatingApptById[notification._id]}
+                              className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${creatingApptById[notification._id] ? "bg-blue-400 text-white cursor-wait opacity-80" : "bg-blue-600 text-white hover:bg-blue-700"}`}
                             >
-                              Tạo lịch
+                              {creatingApptById[notification._id] ? "Đang tạo..." : "Tạo lịch"}
                             </button>
                           ) : (
                             <>
                               <button
                                 onClick={(e) => handleAcceptDeposit(e, notification)}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                                disabled={acceptingById[notification._id]}
+                                className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${acceptingById[notification._id] ? "bg-green-400 text-white cursor-wait opacity-80" : "bg-green-600 text-white hover:bg-green-700"}`}
                               >
-                                Chấp nhận
+                                {acceptingById[notification._id] ? "Đang chấp nhận..." : "Chấp nhận"}
                               </button>
                               <button
                                 onClick={(e) => handleRejectDeposit(e, notification)}
-                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                                disabled={rejectingById[notification._id]}
+                                className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${rejectingById[notification._id] ? "bg-red-400 text-white cursor-wait opacity-80" : "bg-red-600 text-white hover:bg-red-700"}`}
                               >
-                                Từ chối
+                                {rejectingById[notification._id] ? "Đang từ chối..." : "Từ chối"}
                               </button>
                             </>
                           )}
@@ -978,15 +1018,17 @@ const NotificationDepositPage: React.FC = () => {
                       <div className="flex gap-2 mt-3">
                         <button
                           onClick={(e) => handleAcceptAppointment(e, notification)}
-                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                          disabled={acceptingApptById[notification._id]}
+                          className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${acceptingApptById[notification._id] ? "bg-green-400 text-white cursor-wait opacity-80" : "bg-green-600 text-white hover:bg-green-700"}`}
                         >
-                          Chấp nhận
+                          {acceptingApptById[notification._id] ? "Đang chấp nhận..." : "Chấp nhận"}
                         </button>
                         <button
                           onClick={(e) => handleRejectAppointment(e, notification)}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                          disabled={rejectingApptById[notification._id]}
+                          className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${rejectingApptById[notification._id] ? "bg-red-400 text-white cursor-wait opacity-80" : "bg-red-600 text-white hover:bg-red-700"}`}
                         >
-                          Từ chối
+                          {rejectingApptById[notification._id] ? "Đang xử lý..." : "Từ chối"}
                         </button>
                       </div>
                     )}
@@ -996,9 +1038,10 @@ const NotificationDepositPage: React.FC = () => {
                       <div className="flex gap-2 mt-3">
                         <button
                           onClick={(e) => handleCreateAppointment(e, notification)}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                          disabled={creatingApptById[notification._id]}
+                          className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${creatingApptById[notification._id] ? "bg-blue-400 text-white cursor-wait opacity-80" : "bg-blue-600 text-white hover:bg-blue-700"}`}
                         >
-                          Đặt lịch
+                          {creatingApptById[notification._id] ? "Đang tạo..." : "Đặt lịch"}
                         </button>
                       </div>
                     )}
