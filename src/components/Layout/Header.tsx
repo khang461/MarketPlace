@@ -188,14 +188,20 @@ const Header: React.FC = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      // Lưu lịch sử tìm kiếm nếu user đã đăng nhập
+    const trimmedQuery = searchQuery.trim();
+
+    if (trimmedQuery) {
+      // Có từ khóa: lưu lịch sử và tìm kiếm với keyword
       if (isAuthenticated) {
-        saveSearchToHistory(searchQuery.trim());
+        saveSearchToHistory(trimmedQuery);
       }
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-      setShowSuggestions(false);
+      navigate(`/search?q=${encodeURIComponent(trimmedQuery)}`);
+    } else {
+      // Không có từ khóa: navigate về search page để hiển thị toàn bộ
+      navigate("/search");
     }
+
+    setShowSuggestions(false);
   };
 
   const handleSuggestionClick = (suggestion: SearchSuggestion) => {
