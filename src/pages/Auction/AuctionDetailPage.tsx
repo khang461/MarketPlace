@@ -217,9 +217,14 @@ export default function AuctionDetailPage() {
           .filter(Boolean)
           .join(", ");
 
+  // Prefer listing.thumbnail, then listing.photos[0].url (Cloudinary), then any images[] fallback
+  const rawListing = (auction as any)?.listing;
   const heroThumb =
-    (auction as any)?.listing?.thumbnail ||
-    (auction as any)?.listing?.images?.[0];
+    rawListing?.thumbnail ||
+    (Array.isArray(rawListing?.photos) && rawListing.photos[0]?.url) ||
+    (Array.isArray(rawListing?.photos) && rawListing.photos[0]?.secure_url) ||
+    rawListing?.images?.[0] ||
+    undefined;
 
   const winnerBid = useMemo(() => topBid(auction), [auction]);
 
