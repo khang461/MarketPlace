@@ -53,18 +53,28 @@ const ChatNotificationListener: React.FC = () => {
     NotificationManager.requestPermission();
 
     // Listen for message notifications from other chats
+    // Backend emits "new_message" event
     socket.on(
-      "message_notification",
-      (data: {
+      "new_message",
+      (message: {
+        _id: string;
         chatId: string;
-        senderId: string;
-        senderName?: string;
-        senderAvatar?: string;
+        senderId: {
+          _id: string;
+          fullName: string;
+          avatar?: string;
+        };
         content: string;
         messageType?: string;
-        timestamp?: Date;
+        createdAt: string;
       }) => {
-        console.log("📬 Message notification received:", data);
+        console.log("📬 Message notification received:", message);
+
+        // Skip nếu message do mình gửi
+        if (message.senderId._id === user?.id) {
+          console.log("⏭️ Skipping notification - message from current user");
+          return;
+        }
 
         // Chỉ show notification nếu không đang ở trong chat đó
         const currentChatId = location.pathname.split("/chat/")[1];
@@ -72,17 +82,17 @@ const ChatNotificationListener: React.FC = () => {
           "Current chat:",
           currentChatId,
           "Notification from:",
-          data.chatId
+          message.chatId
         );
 
-        if (currentChatId === data.chatId) {
+        if (currentChatId === message.chatId) {
           console.log("⏭️ Skipping notification - already in this chat");
           return; // Đang ở trong chat này, không cần notification
         }
 
         console.log(
           "✅ Showing notification for message from:",
-          data.senderName
+          message.senderId.fullName
         );
 
         // Show toast notification
@@ -90,8 +100,8 @@ const ChatNotificationListener: React.FC = () => {
           toast: true,
           position: "top-end",
           icon: "info",
-          title: `${data.senderName || "Tin nhắn mới"}`,
-          text: data.content,
+          title: `${message.senderId.fullName || "Tin nhắn mới"}`,
+          text: message.content,
           showConfirmButton: false,
           timer: 4000,
           timerProgressBar: true,
@@ -101,7 +111,7 @@ const ChatNotificationListener: React.FC = () => {
           },
           didOpen: (toast) => {
             toast.addEventListener("click", () => {
-              navigate(`/chat/${data.chatId}`);
+              navigate(`/chat/${message.chatId}`);
               Swal.close();
             });
           },
@@ -109,14 +119,14 @@ const ChatNotificationListener: React.FC = () => {
 
         // Show browser notification and play sound
         NotificationManager.showMessageNotification(
-          data.senderName || "Tin nhắn mới",
-          data.content,
+          message.senderId.fullName || "Tin nhắn mới",
+          message.content,
           {
-            avatar: data.senderAvatar,
-            chatId: data.chatId,
+            avatar: message.senderId.avatar,
+            chatId: message.chatId,
             onlyWhenHidden: true,
             onClick: () => {
-              navigate(`/chat/${data.chatId}`);
+              navigate(`/chat/${message.chatId}`);
             },
           }
         );
@@ -145,7 +155,7 @@ const ChatNotificationListener: React.FC = () => {
     );
 
     return () => {
-      socket.off("message_notification");
+      socket.off("new_message");
       socket.off("chat_list_update");
     };
   }, [socket, isConnected, user, navigate, location.pathname]);

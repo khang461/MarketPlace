@@ -949,15 +949,15 @@ const AppointmentManagement: React.FC = () => {
 
 <p style="font-weight: bold; text-transform: uppercase; margin: 20px 0 10px 0;">ĐIỀU 2. GIÁ MUA BÁN VÀ PHƯƠNG THỨC THANH TOÁN</p>
 <p style="font-weight: bold; margin: 5px 0;">1. Giá mua bán xe nêu tại Điều 1 là: ${(
-      appointment.transaction?.depositAmount || 0
+      appointment.transaction?.vehiclePrice || 0
     ).toLocaleString("vi-VN")} VNĐ</p>
 <p style="margin: 5px 0;">(Bằng chữ: ${createPlaceholder(50)})</p>
 <p style="font-weight: bold; margin: 5px 0;">2. Số tiền đặt cọc: ${(
       appointment.transaction?.depositAmount || 0
     ).toLocaleString("vi-VN")} VNĐ</p>
-<p style="font-weight: bold; margin: 5px 0;">3. Số tiền còn lại: ${createPlaceholder(
-      20
-    )} VNĐ</p>
+<p style="font-weight: bold; margin: 5px 0;">3. Số tiền còn lại: ${(
+      appointment.transaction?.remainingAmount || 0
+    ).toLocaleString("vi-VN")} VNĐ</p>
 <p style="font-weight: bold; margin: 5px 0;">4. Phương thức thanh toán: ${createPlaceholder(
       20
     )}</p>
