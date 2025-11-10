@@ -29,36 +29,90 @@ export default function AuctionCard({ a }: { a: Auction }) {
   return (
     <Link
       to={`/auctions/${a._id}`}
-      className="block rounded-xl border hover:shadow-md overflow-hidden"
+      className="group block overflow-hidden rounded-2xl border bg-white transition-shadow hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary/30"
+      aria-label={`Xem chi tiết đấu giá ${title}`}
     >
-      <div className="aspect-[16/9] bg-gray-100">
+      {/* Media */}
+      <div className="relative aspect-[16/9] overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
         {(a as any).listing?.thumbnail && (
           <img
             src={(a as any).listing.thumbnail}
-            className="w-full h-full object-cover"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
             alt={title}
+            loading="lazy"
           />
         )}
-      </div>
 
-      <div className="p-3 space-y-1">
-        {locationText && (
-          <div className="text-sm text-gray-500">{locationText}</div>
-        )}
+        {/* Gradient overlay for better text contrast */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent" />
 
-        <h3 className="font-semibold line-clamp-1">{title}</h3>
-
-        <div className="text-sm">
-          Giá hiện tại: <b>{currentPrice.toLocaleString()}₫</b>
-        </div>
-
-        <AuctionCountdown startAt={a.startAt} endAt={a.endAt} status={uiStatus} />
-
+        {/* LIVE badge */}
         {uiStatus === "RUNNING" && (
-          <span className="inline-block text-[10px] px-2 py-0.5 rounded bg-red-100 text-red-700">
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-red-600/90 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-white shadow">
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
             LIVE
           </span>
         )}
+      </div>
+
+      {/* Content */}
+      <div className="flex flex-col gap-2 p-4">
+        {/* Location */}
+        {locationText && (
+          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+            {/* pin icon (inline SVG để không thêm dependency) */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="h-4 w-4"
+              aria-hidden
+            >
+              <path d="M12 2a7 7 0 0 0-7 7c0 4.418 7 13 7 13s7-8.582 7-13a7 7 0 0 0-7-7Zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z" />
+            </svg>
+            <span className="line-clamp-1">{locationText}</span>
+          </div>
+        )}
+
+        {/* Title */}
+        <h3 className="line-clamp-2 text-base font-semibold tracking-tight text-gray-900 group-hover:text-gray-950">
+          {title}
+        </h3>
+
+        {/* Price & countdown row */}
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-baseline gap-1 text-sm text-gray-600">
+            <span>Giá hiện tại:</span>
+            <span className="text-[15px] font-bold text-gray-900">
+              {currentPrice.toLocaleString()}₫
+            </span>
+          </div>
+
+          <div className="shrink-0 text-right">
+            <AuctionCountdown
+              startAt={a.startAt}
+              endAt={a.endAt}
+              status={uiStatus}
+            />
+          </div>
+        </div>
+
+        {/* subtle divider */}
+        <div className="mt-1 h-px w-full bg-gray-100" />
+
+        {/* Footer hint */}
+        <div className="flex items-center justify-between text-[11px] text-gray-500">
+          <span className="opacity-90">Nhấn để xem chi tiết</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
+            aria-hidden
+          >
+            <path d="M13.172 12 8.222 7.05l1.414-1.414L16 12l-6.364 6.364-1.414-1.414z" />
+          </svg>
+        </div>
       </div>
     </Link>
   );
