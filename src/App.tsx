@@ -21,6 +21,7 @@ import WalletPage from "./pages/WalletPage";
 import NotificationDepositPage from "./pages/NotificationDepositPage";
 import StaffDashboard from "./pages/Staff/StaffDashboard";
 import StaffAppointmentPage from "./pages/Staff/StaffAppointmentPage";
+import StaffUsersPage from "./pages/Staff/StaffUsersPage";
 import ProtectedRoute from "./components/Common/ProtectedRoute";
 import StaffRedirect from "./components/Common/StaffRedirect";
 import ScrollToTop from "./components/ScrollToTop/scrollToTop";
@@ -61,6 +62,14 @@ function App() {
             element={
               <ProtectedRoute requiredRole="staff">
                 <StaffAppointmentPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff/users"
+            element={
+              <ProtectedRoute requiredRole="staff">
+                <StaffUsersPage  />
               </ProtectedRoute>
             }
           />
