@@ -12,7 +12,7 @@ function fmt(ms: number) {
   return `${m}m ${sec}s`;
 }
 
-/** Cho phép truyền status kiểu UI hoặc API, hoặc không truyền (tự suy ra) */
+
 type StatusUI = "PENDING" | "RUNNING" | "ENDED";
 type StatusApi = "active" | "scheduled" | "ended" | "closed";
 
