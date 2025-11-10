@@ -123,38 +123,68 @@ export default function BidBox({
   if (isSeller) return null;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
+    <div className="rounded-2xl border bg-white p-4 shadow-sm">
+      {/* Header: prices */}
+      <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-gray-600">
-          Giá khởi điểm: <b>{Number(auction.startingPrice || 0).toLocaleString("vi-VN")}đ</b>
+          Giá khởi điểm:{" "}
+          <b>{Number(auction.startingPrice || 0).toLocaleString("vi-VN")}đ</b>
         </div>
         <div className="text-sm text-gray-600">
           Giá hiện tại: <b>{Number(cur).toLocaleString("vi-VN")}đ</b>
         </div>
       </div>
 
-      <div className="flex gap-2">
-        <input
-          type="number"
-          min={minNext}
-          step={MIN_STEP}
-          value={amount}
-          onChange={(e) => setAmount(Number(e.target.value))}
-          placeholder={placeholder}
-          className="flex-1 border rounded-md px-3 py-2"
-          disabled={hardDisabled || busy}
-        />
+      {/* Alert for deposit / window / disabled reason */}
+      {(!hasDeposit || !!disabledReason || !isWindowOpen) && (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="mt-0.5 h-4 w-4">
+            <path d="M11 7h2v6h-2V7zm0 8h2v2h-2v-2z" />
+          </svg>
+          <span>{helpText}</span>
+        </div>
+      )}
+
+      {/* Input + action */}
+      <div className="mt-3 flex items-start gap-2">
+        <label className="sr-only" htmlFor="bid-amount">Số tiền đặt giá</label>
+        <div className="relative flex-1">
+          <input
+            id="bid-amount"
+            type="number"
+            min={minNext}
+            step={MIN_STEP}
+            value={amount}
+            onChange={(e) => setAmount(Number(e.target.value))}
+            placeholder={placeholder}
+            className="w-full rounded-xl border px-3 py-2.5 pr-10 text-sm shadow-sm transition focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100 disabled:bg-gray-50"
+            disabled={hardDisabled || busy}
+            inputMode="numeric"
+          />
+          {/* suffix */}
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">đ</span>
+        </div>
         <button
           onClick={submit}
           disabled={hardDisabled || busy}
-          className="px-4 py-2 rounded-md bg-emerald-600 text-white disabled:opacity-50"
+          className="inline-flex min-w-[110px] items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
+          aria-disabled={hardDisabled || busy}
         >
+          {busy && (
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.2" strokeWidth="4" />
+              <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" />
+            </svg>
+          )}
           {busy ? "Đang gửi…" : "Đặt giá"}
         </button>
       </div>
 
-      {helpText && <div className="text-xs text-gray-500">{helpText}</div>}
-      {msg && <div className="text-xs text-amber-700">{msg}</div>}
+      {/* Helper & messages */}
+      <div className="mt-2 space-y-1">
+        {helpText && <div className="text-[11px] text-gray-500">{helpText}</div>}
+        {msg && <div className="text-[11px] font-medium text-amber-700">{msg}</div>}
+      </div>
     </div>
   );
 }

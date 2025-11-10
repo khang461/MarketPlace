@@ -10,13 +10,13 @@ import {
 } from "../../config/auctionDepositAPI";
 import { useAuth } from "../../contexts/AuthContext";
 import Swal from "sweetalert2";
+import { useNavigate } from "react-router-dom";
 
 type UIState = "unknown" | "has" | "none";
 
 /** Chuẩn hoá dữ liệu BE (nhiều biến thể) -> user đã có cọc hợp lệ chưa */
 function pickHasDeposit(d?: any): boolean {
   if (!d) return false;
-  // Swagger mẫu: { success, data: { hasDeposited, deposit: { status } } }
   if (typeof d.hasDeposited === "boolean") return d.hasDeposited;
   if (typeof d.hasDeposit === "boolean") return d.hasDeposit;
   const s: string =
@@ -25,7 +25,6 @@ function pickHasDeposit(d?: any): boolean {
     "";
   if (!s) return false;
   const k = s.toLowerCase();
-  // Các trạng thái coi như có cọc “được giữ/đã nộp”
   return ["frozen", "deposited", "held", "deducted"].includes(k);
 }
 
@@ -58,6 +57,7 @@ export default function DepositButton({
   isSeller?: boolean;
 }) {
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
   // Người bán -> ẩn hoàn toàn
   if (isSeller) return null;
@@ -66,6 +66,15 @@ export default function DepositButton({
   const [ui, setUi] = useState<UIState>("unknown");
   const [amount, setAmount] = useState<number | undefined>(undefined);
   const [msg, setMsg] = useState<string>("");
+
+  // Modal nạp tiền (thay cho window.location.href)
+  const [topupOpen, setTopupOpen] = useState(false);
+  const [topupData, setTopupData] = useState<{
+    requiredAmount: number;
+    currentBalance: number;
+    vnpayUrl?: string;
+    message?: string;
+  } | null>(null);
 
   // đồng hồ nhỏ: để canCancel cập nhật “đúng giây”
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -99,12 +108,9 @@ export default function DepositButton({
   const refresh = async () => {
     setMsg("");
     try {
-      // checkDepositStatus trả về phần data đã bóc sẵn (core<...>)
       const d: DepositStatusResp | any = await checkDepositStatus(auctionId);
       if (!mountedRef.current) return;
 
-      // coi như “đã có cọc” nếu pickHasDeposit(d) true
-      // hoặc BE vẫn còn document deposit (d.deposit._id) => user từng cọc trước đó
       const nextHas = pickHasDeposit(d) || Boolean(d?.deposit?._id);
       const amt = pickAmount(d);
 
@@ -125,27 +131,15 @@ export default function DepositButton({
   }, [auctionId]);
 
   const handleDeposit = async () => {
-    console.log("🔵 handleDeposit called");
-    if (loading || isSeller || isEnded) {
-      console.log("⚠️ Blocked:", { loading, isSeller, isEnded });
-      return;
-    }
+    if (loading || isSeller || isEnded) return;
     setLoading(true);
     setMsg("");
     try {
-      console.log("🔵 Calling API...");
       const response = await createAuctionDeposit(auctionId);
       const data = response?.data || response;
 
-      console.log("✅ Deposit response:", response);
-      console.log("✅ Data:", data);
-      console.log("🔍 data.success:", data.success);
-      console.log("🔍 data.vnpayUrl:", data.vnpayUrl);
-      console.log("🔍 data.requiredAmount:", data.requiredAmount);
-
       // Đặt cọc thành công
       if (data.success === true) {
-        console.log("✅ Success branch");
         await refresh();
         await Swal.fire({
           icon: "success",
@@ -158,138 +152,33 @@ export default function DepositButton({
         data.vnpayUrl ||
         data.requiredAmount
       ) {
-        // Số dư không đủ hoặc có lỗi
-        console.log("⚠️ Insufficient balance branch");
+        // Thiếu tiền -> mở modal nạp tiền
         const requiredAmount = data.requiredAmount || 1000000;
         const currentBalance = data.currentBalance || 0;
-        const needAmount = requiredAmount - currentBalance;
-
-        console.log("💰 Showing popup...");
-        await Swal.fire({
-          icon: "warning",
-          title: "Số dư không đủ",
-          html: `
-            <div class="text-left">
-              <p class="mb-4 text-gray-700">${
-                data.message || "Số dư trong ví không đủ để đặt cọc"
-              }</p>
-              <div class="bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-lg space-y-3 border border-gray-200">
-                <div class="flex justify-between items-center">
-                  <span class="text-gray-600">Phí đặt cọc:</span>
-                  <span class="font-semibold text-lg">${requiredAmount.toLocaleString(
-                    "vi-VN"
-                  )}₫</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-gray-600">Số dư hiện tại:</span>
-                  <span class="font-semibold text-lg">${currentBalance.toLocaleString(
-                    "vi-VN"
-                  )}₫</span>
-                </div>
-                <div class="border-t-2 border-gray-300 pt-3 flex justify-between items-center">
-                  <span class="text-gray-700 font-medium">Cần nạp thêm:</span>
-                  <span class="font-bold text-xl text-red-600">${needAmount.toLocaleString(
-                    "vi-VN"
-                  )}₫</span>
-                </div>
-              </div>
-              <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p class="text-sm text-blue-800">
-                  <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                  </svg>
-                  Bạn sẽ được chuyển đến VNPay để nạp tiền
-                </p>
-              </div>
-            </div>
-          `,
-          showCancelButton: true,
-          confirmButtonColor: "#10b981",
-          cancelButtonColor: "#6b7280",
-          confirmButtonText:
-            '<svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg> Nạp tiền qua VNPay',
-          cancelButtonText: "Để sau",
-          width: "500px",
-        }).then((result) => {
-          if (result.isConfirmed && data.vnpayUrl) {
-            console.log("🔗 Redirecting to VNPay:", data.vnpayUrl);
-            // Redirect đến VNPay
-            window.location.href = data.vnpayUrl;
-          }
+        setTopupData({
+          requiredAmount,
+          currentBalance,
+          vnpayUrl: data.vnpayUrl,
+          message: data.message || "Số dư trong ví không đủ để đặt cọc",
         });
-        console.log("✅ Popup closed");
+        setTopupOpen(true);
       } else {
-        // Lỗi khác
-        console.log("❓ Unknown state");
         setMsg(data.message || "Không thể đặt cọc. Vui lòng thử lại.");
       }
     } catch (e: any) {
-      console.log("❌ Deposit error:", e);
-      console.log("❌ Error response:", e?.response);
-      console.log("❌ Error data:", e?.response?.data);
-
-      // Kiểm tra lỗi từ response
       const errorData = e?.response?.data;
 
       // Trường hợp số dư không đủ (có vnpayUrl hoặc requiredAmount)
       if (errorData && (errorData.vnpayUrl || errorData.requiredAmount)) {
         const requiredAmount = errorData.requiredAmount || 1000000;
         const currentBalance = errorData.currentBalance || 0;
-        const needAmount = requiredAmount - currentBalance;
-
-        // Hiển thị popup thông báo số dư không đủ
-        await Swal.fire({
-          icon: "warning",
-          title: "Số dư không đủ",
-          html: `
-            <div class="text-left">
-              <p class="mb-4 text-gray-700">${
-                errorData.message || "Số dư trong ví không đủ để đặt cọc"
-              }</p>
-              <div class="bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-lg space-y-3 border border-gray-200">
-                <div class="flex justify-between items-center">
-                  <span class="text-gray-600">Phí đặt cọc:</span>
-                  <span class="font-semibold text-lg">${requiredAmount.toLocaleString(
-                    "vi-VN"
-                  )}₫</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-gray-600">Số dư hiện tại:</span>
-                  <span class="font-semibold text-lg">${currentBalance.toLocaleString(
-                    "vi-VN"
-                  )}₫</span>
-                </div>
-                <div class="border-t-2 border-gray-300 pt-3 flex justify-between items-center">
-                  <span class="text-gray-700 font-medium">Cần nạp thêm:</span>
-                  <span class="font-bold text-xl text-red-600">${needAmount.toLocaleString(
-                    "vi-VN"
-                  )}₫</span>
-                </div>
-              </div>
-              <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p class="text-sm text-blue-800">
-                  <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                  </svg>
-                  Vui lòng nạp tiền vào ví để có thể đặt cọc tham gia đấu giá
-                </p>
-              </div>
-            </div>
-          `,
-          showCancelButton: true,
-          confirmButtonColor: "#10b981",
-          cancelButtonColor: "#6b7280",
-          confirmButtonText:
-            '<svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg> Nạp tiền vào ví',
-          cancelButtonText: "Để sau",
-          width: "500px",
-        }).then((result) => {
-          if (result.isConfirmed) {
-            // Chuyển đến trang nạp tiền
-            window.location.href = "/account?tab=wallet";
-          }
+        setTopupData({
+          requiredAmount,
+          currentBalance,
+          vnpayUrl: errorData.vnpayUrl,
+          message: errorData.message || "Số dư trong ví không đủ để đặt cọc",
         });
-
+        setTopupOpen(true);
         if (mountedRef.current) setLoading(false);
         return;
       }
@@ -301,7 +190,6 @@ export default function DepositButton({
           "Bạn đã có cọc cho phiên này (kể cả đã hủy). Hệ thống không cho đặt lại."
         );
       } else {
-        // Lỗi khác
         setMsg(
           errorData?.message ||
             e?.message ||
@@ -315,9 +203,16 @@ export default function DepositButton({
 
   const handleCancel = async () => {
     if (loading || !canCancel) return;
-    const ok = window.confirm(
-      "Bạn chắc muốn hủy đặt cọc? Sau khi phiên bắt đầu sẽ không thể hủy."
-    );
+
+    const ok = await Swal.fire({
+      icon: "question",
+      title: "Hủy đặt cọc?",
+      text: "Chỉ hủy được trước khi phiên bắt đầu.",
+      showCancelButton: true,
+      confirmButtonText: "Hủy đặt cọc",
+      cancelButtonText: "Đóng",
+    }).then((r) => r.isConfirmed);
+
     if (!ok) return;
 
     setLoading(true);
@@ -340,8 +235,18 @@ export default function DepositButton({
     return (
       <a
         href="/signin"
-        className="px-4 py-2 rounded-md bg-indigo-600 text-white"
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
       >
+        {/* icon login */}
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          className="h-4 w-4"
+          aria-hidden
+        >
+          <path d="M10 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-8v-2h7V5h-7V3Zm-1.293 5.293 1.414 1.414L8.828 11H18v2H8.828l1.293 1.293-1.414 1.414L5 12l3.707-3.707Z" />
+        </svg>
         Đăng nhập để đặt cọc
       </a>
     );
@@ -355,14 +260,16 @@ export default function DepositButton({
     return (
       <div className="flex items-center gap-2">
         {hasDeposit ? (
-          <span className="px-3 py-1 rounded bg-emerald-50 text-emerald-700 text-sm">
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
+            {/* check icon */}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
             Đã đặt cọc
             {typeof amount === "number"
               ? ` (${amount.toLocaleString("vi-VN")}₫)`
               : ""}
           </span>
         ) : (
-          <span className="px-3 py-1 rounded bg-gray-100 text-gray-600 text-sm">
+          <span className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-600">
             Chưa đặt cọc
           </span>
         )}
@@ -373,39 +280,181 @@ export default function DepositButton({
 
   // Phiên chưa kết thúc: hiển thị hành động
   return (
-    <div className="flex items-center gap-2">
-      {hasDeposit ? (
-        canCancel ? (
-          <button
-            onClick={handleCancel}
-            disabled={loading}
-            className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
-            title="Chỉ hủy được trước khi phiên bắt đầu"
-          >
-            {loading ? "Đang hủy…" : "Hủy đặt cọc"}
-          </button>
+    <>
+      <div className="flex items-center gap-2">
+        {hasDeposit ? (
+          canCancel ? (
+            <button
+              onClick={handleCancel}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-60"
+              title="Chỉ hủy được trước khi phiên bắt đầu"
+            >
+              {loading && (
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.2" strokeWidth="4" />
+                  <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" />
+                </svg>
+              )}
+              {loading ? "Đang hủy…" : "Hủy đặt cọc"}
+            </button>
+          ) : (
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700"
+              title="Không thể hủy sau khi phiên đã bắt đầu"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
+              Đã đặt cọc
+              {typeof amount === "number"
+                ? ` (${amount.toLocaleString("vi-VN")}₫)`
+                : ""}
+            </span>
+          )
         ) : (
-          <span
-            className="px-3 py-1 rounded bg-emerald-50 text-emerald-700 text-sm"
-            title="Không thể hủy sau khi phiên đã bắt đầu"
+          <button
+            onClick={handleDeposit}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:opacity-60"
           >
-            Đã đặt cọc
-            {typeof amount === "number"
-              ? ` (${amount.toLocaleString("vi-VN")}₫)`
-              : ""}
-          </span>
-        )
-      ) : (
-        <button
-          onClick={handleDeposit}
-          disabled={loading}
-          className="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {loading ? "Đang xử lý…" : "Đặt cọc để tham gia"}
-        </button>
-      )}
+            {loading && (
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.2" strokeWidth="4" />
+                <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" />
+              </svg>
+            )}
+            {loading ? "Đang xử lý…" : "Đặt cọc để tham gia"}
+          </button>
+        )}
 
-      {msg && <span className="text-xs text-amber-700">{msg}</span>}
+        {msg && <span className="text-xs font-medium text-amber-700">{msg}</span>}
+      </div>
+
+      {/* Modal nạp tiền */}
+      <TopupModal
+        open={topupOpen}
+        data={topupData}
+        onClose={() => setTopupOpen(false)}
+        onOpenVnpay={(url) => {
+          const a = document.createElement("a");
+          a.href = url;
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.click();
+        }}
+        onOpenWallet={() => {
+          setTopupOpen(false);
+          navigate("/wallet");
+        }}
+        onRefreshed={async () => {
+          await refresh();
+          setTopupOpen(false);
+        }}
+      />
+    </>
+  );
+}
+
+/** ================ Modal Nạp Tiền ================ */
+function TopupModal({
+  open,
+  data,
+  onClose,
+  onOpenVnpay,
+  onOpenWallet,
+  onRefreshed,
+}: {
+  open: boolean;
+  data: {
+    requiredAmount: number;
+    currentBalance: number;
+    vnpayUrl?: string;
+    message?: string;
+  } | null;
+  onClose: () => void;
+  onOpenVnpay: (url: string) => void;
+  onOpenWallet: () => void;
+  onRefreshed: () => void | Promise<void>;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    if (open) window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open || !data) return null;
+
+  const need = Math.max(0, data.requiredAmount - data.currentBalance);
+
+  return (
+    <div className="fixed inset-0 z-[1000]">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl ring-1 ring-black/5">
+          <div className="p-5">
+            <h3 className="text-lg font-semibold">Số dư không đủ</h3>
+            {data.message && <p className="mt-1 text-sm text-gray-600">{data.message}</p>}
+
+            <div className="mt-4 space-y-3 rounded-lg border bg-gray-50 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Phí đặt cọc</span>
+                <b>{data.requiredAmount.toLocaleString("vi-VN")}₫</b>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Số dư hiện tại</span>
+                <b>{data.currentBalance.toLocaleString("vi-VN")}₫</b>
+              </div>
+              <div className="flex items-center justify-between border-t pt-3">
+                <span className="font-medium text-gray-800">Cần nạp thêm</span>
+                <span className="font-bold text-red-600 text-lg">
+                  {need.toLocaleString("vi-VN")}₫
+                </span>
+              </div>
+              {data.vnpayUrl && (
+                <div className="text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded-md p-2">
+                  Bạn có thể nạp qua VNPay — chúng tôi sẽ mở trong tab mới.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="px-5 pb-5 flex flex-wrap gap-2 justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              Để sau
+            </button>
+
+            <button
+              type="button"
+              onClick={onRefreshed}
+              className="px-4 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              title="Sau khi nạp xong, bấm để cập nhật trạng thái"
+            >
+              Đã nạp xong • Làm mới
+            </button>
+
+            {data.vnpayUrl && (
+              <button
+                type="button"
+                onClick={() => onOpenVnpay(data.vnpayUrl!)}
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+              >
+                Mở VNPay (tab mới)
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onOpenWallet}
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+            >
+              Mở trang Ví
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
