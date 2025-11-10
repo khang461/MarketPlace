@@ -11,6 +11,7 @@ interface Appointment {
   location: string;
   status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
   type: 'CONTRACT_SIGNING';
+  contractPhotos?: Array<{ url?: string; photoUrl?: string }>;
   buyer: {
     id: string;
     name: string;
@@ -61,6 +62,7 @@ const AppointmentManagement: React.FC = () => {
   const [contractPhotos, setContractPhotos] = useState<{ seller: string[]; buyer: string[] }>({ seller: [], buyer: [] });
   // State cho preview files trước khi upload
   const [previewFiles, setPreviewFiles] = useState<{ seller: File[]; buyer: File[] }>({ seller: [], buyer: [] });
+  const [completedContractPhotos, setCompletedContractPhotos] = useState<string[]>([]);
 
   useEffect(() => {
     fetchAppointments();
@@ -144,6 +146,16 @@ const AppointmentManagement: React.FC = () => {
   const openModal = async (appointment: Appointment) => {
     setSelectedAppointment(appointment);
     setIsModalOpen(true);
+
+    // Nếu đã hoàn thành và danh sách ảnh có sẵn trong appointment, dùng luôn
+    if (appointment.status === 'COMPLETED' && Array.isArray(appointment.contractPhotos)) {
+      const urls = appointment.contractPhotos
+        .map(p => p?.url || p?.photoUrl)
+        .filter(Boolean) as string[];
+      if (urls.length > 0) {
+        setCompletedContractPhotos(urls);
+      }
+    }
     // Fetch contract photos when opening modal
     await fetchContractPhotos(appointment.appointmentId);
   };
@@ -163,6 +175,7 @@ const AppointmentManagement: React.FC = () => {
     setSelectedAppointment(null);
     setContractPhotos({ seller: [], buyer: [] });
     setPreviewFiles({ seller: [], buyer: [] });
+    setCompletedContractPhotos([]);
   };
 
   const fetchContractPhotos = async (appointmentId: string) => {
@@ -185,6 +198,7 @@ const AppointmentManagement: React.FC = () => {
         // Thử nhiều cách để lấy photos
         let sellerPhotos: string[] = [];
         let buyerPhotos: string[] = [];
+        let signedContractPhotos: string[] = [];
         
         // Cách 1: sellerPhotos và buyerPhotos trực tiếp
         if (contract.sellerPhotos && Array.isArray(contract.sellerPhotos)) {
@@ -216,6 +230,13 @@ const AppointmentManagement: React.FC = () => {
           if (sellerPhotosFromArray.length) sellerPhotos = sellerPhotosFromArray;
           if (buyerPhotosFromArray.length) buyerPhotos = buyerPhotosFromArray;
         }
+
+        // Cách 4: contractPhotos là mảng ảnh đã ký (COMPLETED)
+        if (Array.isArray(contract.contractPhotos)) {
+          signedContractPhotos = (contract.contractPhotos as Array<{ url?: string; photoUrl?: string }>)
+            .map(p => p.url || p.photoUrl)
+            .filter(Boolean) as string[];
+        }
         
         console.log('Final Seller photos:', sellerPhotos);
         console.log('Final Buyer photos:', buyerPhotos);
@@ -226,6 +247,19 @@ const AppointmentManagement: React.FC = () => {
             seller: sellerPhotos.length > 0 ? sellerPhotos : prev.seller,
             buyer: buyerPhotos.length > 0 ? buyerPhotos : prev.buyer,
           }));
+        }
+
+        if (signedContractPhotos.length > 0) {
+          setCompletedContractPhotos(signedContractPhotos);
+        } else {
+          // Fallback: lấy từ danh sách appointments trong state
+          const fromList = appointments.find(a => a.appointmentId === appointmentId)?.contractPhotos;
+          if (Array.isArray(fromList)) {
+            const urls = fromList.map(p => p?.url || p?.photoUrl).filter(Boolean) as string[];
+            if (urls.length > 0) {
+              setCompletedContractPhotos(urls);
+            }
+          }
         }
       } else {
         console.warn('No contract data found in response');
@@ -275,72 +309,66 @@ const AppointmentManagement: React.FC = () => {
     }));
   };
 
-  // Upload tất cả files
-  const handleUploadPhotos = async (side: 'seller' | 'buyer') => {
-    const files = previewFiles[side];
-    
-    if (!files || files.length === 0) {
+  // Upload tất cả files - BỎ tính năng upload từng bên, chuyển sang upload chung
+
+  // Upload cả 2 bên: yêu cầu đủ 3 ảnh bên bán và 3 ảnh bên mua
+  const handleUploadBothSides = async () => {
+    const sellerFiles = previewFiles.seller;
+    const buyerFiles = previewFiles.buyer;
+
+    if (sellerFiles.length !== 3 || buyerFiles.length !== 3) {
       Swal.fire({
         icon: "warning",
-        title: "Cảnh báo!",
-        text: "Vui lòng chọn ít nhất 1 ảnh để upload",
+        title: "Chưa đủ ảnh",
+        text: "Vui lòng chọn đủ các mặt của hợp đồng.",
         confirmButtonColor: "#2563eb",
       });
       return;
     }
 
-    if (!selectedAppointment) {
-      return;
-    }
+    if (!selectedAppointment) return;
 
     try {
       const formData = new FormData();
-      
-      // Thêm tất cả files vào FormData
-      files.forEach(file => {
-        formData.append('photos', file);
-      });
-      
+      // Append theo thứ tự: seller trước, buyer sau
+      sellerFiles.forEach(file => formData.append('photos', file));
+      buyerFiles.forEach(file => formData.append('photos', file));
       formData.append('description', 'Ảnh hợp đồng đã ký');
 
       const response = await api.post(`/contracts/${selectedAppointment.appointmentId}/upload-photos`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      console.log('Upload response:', response.data);
-
       if (response.data.success) {
-        // Lấy URLs từ response
         const uploadedPhotos = response.data.data?.photos || [];
         const photoUrls = uploadedPhotos
           .map((p: { url?: string; photoUrl?: string }) => p.url || p.photoUrl)
           .filter(Boolean) as string[];
-        
-        // Replace toàn bộ ảnh cũ bằng ảnh mới
+
+        // Chia 6 ảnh: 3 ảnh đầu cho seller, 3 ảnh sau cho buyer (theo thứ tự append)
+        const sellerUrls = photoUrls.slice(0, 3);
+        const buyerUrls = photoUrls.slice(3, 6);
+
         setContractPhotos(prev => ({
           ...prev,
-          [side]: photoUrls
+          seller: sellerUrls.length === 3 ? sellerUrls : prev.seller,
+          buyer: buyerUrls.length === 3 ? buyerUrls : prev.buyer,
         }));
-        
-        // Xóa preview files sau khi upload thành công
-        setPreviewFiles(prev => ({
-          ...prev,
-          [side]: []
-        }));
-        
+
+        // Xóa preview sau khi upload
+        setPreviewFiles({ seller: [], buyer: [] });
+
         Swal.fire({
           icon: "success",
           title: "Thành công!",
-          text: `Đã upload ${photoUrls.length} ảnh thành công`,
+          text: "Đã upload 6 ảnh hợp đồng (3 bên bán, 3 bên mua).",
           confirmButtonColor: "#2563eb",
           timer: 1500,
           showConfirmButton: false,
         });
       }
     } catch (error) {
-      console.error('Error uploading photos:', error);
+      console.error('Error uploading both sides photos:', error);
       const axiosError = error as { response?: { data?: { message?: string } } };
       Swal.fire({
         icon: "error",
@@ -965,41 +993,43 @@ const AppointmentManagement: React.FC = () => {
                           Xem chi tiết
                         </button>
                         
-                        <div className="relative dropdown-menu-container">
-                          <button
-                            onClick={() => toggleDropdown(appointment.id)}
-                            className="text-green-600 hover:text-green-900 flex items-center"
-                          >
-                            <FileText className="w-4 h-4 mr-1" />
-                            In hợp đồng
-                            <ChevronDown className="w-3 h-3 ml-1" />
-                          </button>
-                          
-                          {dropdownOpen === appointment.id && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  generateContractWithData(appointment);
-                                }}
-                                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                              >
-                                <FileText className="w-4 h-4 mr-3" />
-                                Hợp đồng có dữ liệu
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  generateEmptyContract();
-                                }}
-                                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                              >
-                                <FileText className="w-4 h-4 mr-3" />
-                                Hợp đồng trắng
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                        {appointment.status === 'CONFIRMED' && (
+                          <div className="relative dropdown-menu-container">
+                            <button
+                              onClick={() => toggleDropdown(appointment.id)}
+                              className="text-green-600 hover:text-green-900 flex items-center"
+                            >
+                              <FileText className="w-4 h-4 mr-1" />
+                              In hợp đồng
+                              <ChevronDown className="w-3 h-3 ml-1" />
+                            </button>
+                            
+                            {dropdownOpen === appointment.id && (
+                              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    generateContractWithData(appointment);
+                                  }}
+                                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                >
+                                  <FileText className="w-4 h-4 mr-3" />
+                                  Hợp đồng có dữ liệu
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    generateEmptyContract();
+                                  }}
+                                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                >
+                                  <FileText className="w-4 h-4 mr-3" />
+                                  Hợp đồng trắng
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1237,15 +1267,10 @@ const AppointmentManagement: React.FC = () => {
                         </div>
                       )}
                       
-                      {/* Nút Upload - chỉ hiển thị khi có file preview */}
-                      {previewFiles.seller.length > 0 && (
-                        <button
-                          onClick={() => handleUploadPhotos('seller')}
-                          className="w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-colors"
-                        >
-                          Upload {previewFiles.seller.length} ảnh
-                        </button>
-                      )}
+                      {/* Yêu cầu đủ 3 ảnh mỗi bên mới cho phép upload */}
+                      <p className="text-xs text-gray-500">
+                        Cần đủ các mặt của hợp đồng để có thể upload.
+                      </p>
                       
                       {contractPhotos.seller.length === 0 && previewFiles.seller.length === 0 && (
                         <div className="mb-3 text-xs text-gray-400">Chưa có ảnh nào được chọn</div>
@@ -1403,15 +1428,9 @@ const AppointmentManagement: React.FC = () => {
                         </div>
                       )}
                       
-                      {/* Nút Upload - chỉ hiển thị khi có file preview */}
-                      {previewFiles.buyer.length > 0 && (
-                        <button
-                          onClick={() => handleUploadPhotos('buyer')}
-                          className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors"
-                        >
-                          Upload {previewFiles.buyer.length} ảnh
-                        </button>
-                      )}
+                      <p className="text-xs text-gray-500">
+                        Cần đủ các mặt của hợp đồng để có thể upload.
+                      </p>
                       
                       {contractPhotos.buyer.length === 0 && previewFiles.buyer.length === 0 && (
                         <div className="mb-3 text-xs text-gray-400">Chưa có ảnh nào được chọn</div>
@@ -1420,6 +1439,55 @@ const AppointmentManagement: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {/* Nút Upload chung cho cả 2 bên */}
+              {selectedAppointment.status === 'CONFIRMED' && previewFiles.seller.length === 3 && previewFiles.buyer.length === 3 && (
+                <div className="mt-4">
+                  <button
+                    onClick={handleUploadBothSides}
+                    className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
+                  >
+                    Upload ảnh
+                  </button>
+                </div>
+              )}
+
+              {/* Ảnh hợp đồng đã ký khi hoàn thành */}
+              {selectedAppointment.status === 'COMPLETED' && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Ảnh hợp đồng đã ký</h3>
+                  {completedContractPhotos.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {completedContractPhotos.map((photo, index) => {
+                        const imageUrl = photo.startsWith('http') ? photo : `${api.defaults.baseURL || ''}${photo.startsWith('/') ? photo : '/' + photo}`;
+                        return (
+                          <div key={index} className="relative group">
+                            <div
+                              className="cursor-pointer"
+                              onClick={() => openImagePreview(completedContractPhotos, index)}
+                            >
+                              <img
+                                src={imageUrl}
+                                alt={`Contract photo ${index + 1}`}
+                                className="w-full h-40 object-cover rounded-lg border-2 border-gray-200 hover:border-blue-400 transition-colors"
+                                onError={(e) => {
+                                  console.error('Error loading contract image:', photo, 'Full URL:', imageUrl);
+                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Error';
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all pointer-events-none">
+                                <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500">Không có ảnh hợp đồng.</div>
+                  )}
+                </div>
+              )}
 
               {/* Buttons */}
               {selectedAppointment.status === 'CONFIRMED' && (

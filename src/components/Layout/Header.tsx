@@ -456,7 +456,8 @@ const Header: React.FC = () => {
                     to="/account"
                     className="block px-4 py-2 text-gray-700 hover:bg-gray-100 relative"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <User className="w-4 h-4" />
                       <span>Tài khoản</span>
                       {pendingAppointmentsCount > 0 && (
                         <span className="bg-yellow-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-2">
