@@ -59,6 +59,10 @@ interface Transaction {
     }>;
     signedAt?: string;
     completedAt?: string;
+    staff?: {
+      id: string;
+      name: string;
+    };
   };
 }
 
@@ -286,8 +290,9 @@ export default function TransactionDetailPage() {
             </div>
           </div>
 
-          {/* Contract Photos for COMPLETED transactions */}
-          {transaction.status === "COMPLETED" &&
+          {/* Contract Photos for COMPLETED and CANCELLED transactions */}
+          {(transaction.status === "COMPLETED" ||
+            transaction.status === "CANCELLED") &&
             transaction.contract &&
             transaction.contract.photos &&
             transaction.contract.photos.length > 0 && (
@@ -356,6 +361,21 @@ export default function TransactionDetailPage() {
                     ).toLocaleString("vi-VN")}
                   </p>
                 )}
+              </div>
+            )}
+
+          {/* Nhân viên xử lý cho COMPLETED và CANCELLED */}
+          {(transaction.status === "COMPLETED" ||
+            transaction.status === "CANCELLED") &&
+            transaction.contract &&
+            transaction.contract.staff && (
+              <div className="border-t mt-6 pt-6">
+                <p className="text-sm text-gray-700">
+                  <span className="font-medium">Nhân viên xử lý:</span>{" "}
+                  <span className="font-semibold text-purple-600">
+                    {transaction.contract.staff.name}
+                  </span>
+                </p>
               </div>
             )}
 

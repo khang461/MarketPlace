@@ -81,6 +81,10 @@ interface Appointment {
   buyerConfirmedAt?: string;
   sellerConfirmedAt?: string;
   confirmedAt?: string;
+  staff?: {
+    id: string;
+    name: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -389,44 +393,74 @@ const AppointmentManagement: React.FC = () => {
         console.log("Contract data:", contract);
         console.log("Full contract keys:", Object.keys(contract));
 
-        // **LẤY THÔNG TIN VEHICLE VÀ TRANSACTION TỪ CONTRACT**
+        // **CHỈ CẬP NHẬT THÔNG TIN TỪ CONTRACT NẾU THIẾU, GIỮ NGUYÊN DỮ LIỆU BAN ĐẦU**
         if (contract.vehicle || contract.transaction) {
           setSelectedAppointment((prev) => {
             if (!prev) return prev;
 
-            const depositAmount = contract.transaction?.depositAmount || 0;
-            const finalPrice = contract.transaction?.finalPrice || 0;
-            const remainingAmount = finalPrice - depositAmount;
+            // Chỉ tính toán nếu thiếu dữ liệu từ appointment ban đầu
+            const depositAmount = 
+              prev.transaction?.depositAmount || 
+              contract.transaction?.depositAmount || 
+              0;
+            const vehiclePrice = 
+              prev.transaction?.vehiclePrice || 
+              prev.vehicle?.price || 
+              contract.transaction?.finalPrice || 
+              0;
+            const remainingAmount = 
+              prev.transaction?.remainingAmount || 
+              (vehiclePrice - depositAmount);
             const depositPercentage =
-              finalPrice > 0
-                ? `${((depositAmount / finalPrice) * 100).toFixed(2)}%`
-                : "0%";
+              prev.transaction?.depositPercentage ||
+              (vehiclePrice > 0
+                ? `${((depositAmount / vehiclePrice) * 100).toFixed(2)}`
+                : "0.00");
 
-            // Map vehicle data from contract format to display format
-            const vehicleInfo = contract.vehicle
+            // Map vehicle data: Ưu tiên dữ liệu từ appointment, chỉ bổ sung từ contract nếu thiếu
+            const vehicleInfo = prev.vehicle
               ? {
-                  title: contract.vehicle.model || prev.vehicle?.title,
-                  brand: contract.vehicle.brand || prev.vehicle?.brand,
-                  make:
-                    contract.vehicle.make ||
-                    contract.vehicle.model ||
-                    prev.vehicle?.make,
-                  model: contract.vehicle.model || prev.vehicle?.model,
-                  year: contract.vehicle.year || prev.vehicle?.year,
-                  price: finalPrice || prev.vehicle?.price || 0,
+                  ...prev.vehicle,
+                  // Chỉ cập nhật các trường mà appointment không có
+                  title: prev.vehicle.title || contract.vehicle?.model || undefined,
+                  brand: prev.vehicle.brand || contract.vehicle?.brand || undefined,
+                  // Giữ nguyên make từ appointment (quan trọng!)
+                  make: prev.vehicle.make || contract.vehicle?.make || undefined,
+                  model: prev.vehicle.model || contract.vehicle?.model || undefined,
+                  year: prev.vehicle.year || contract.vehicle?.year || undefined,
+                  price: prev.vehicle.price || vehiclePrice || 0,
+                }
+              : contract.vehicle
+              ? {
+                  title: contract.vehicle.model,
+                  brand: contract.vehicle.brand,
+                  make: contract.vehicle.make || contract.vehicle.model,
+                  model: contract.vehicle.model,
+                  year: contract.vehicle.year,
+                  price: vehiclePrice,
                   type: contract.vehicle.type,
                 }
               : prev.vehicle;
 
-            // Map transaction data
-            const transactionInfo = contract.transaction
+            // Map transaction data: Ưu tiên dữ liệu từ appointment, chỉ bổ sung từ contract nếu thiếu
+            const transactionInfo = prev.transaction
+              ? {
+                  ...prev.transaction,
+                  // Chỉ cập nhật nếu thiếu
+                  depositAmount: prev.transaction.depositAmount || depositAmount,
+                  // GIỮ NGUYÊN depositStatus từ appointment (quan trọng!)
+                  depositStatus: prev.transaction.depositStatus || "IN_ESCROW",
+                  vehiclePrice: prev.transaction.vehiclePrice || vehiclePrice,
+                  remainingAmount: prev.transaction.remainingAmount || remainingAmount,
+                  depositPercentage: prev.transaction.depositPercentage || depositPercentage,
+                }
+              : contract.transaction
               ? {
                   depositAmount: depositAmount,
-                  depositStatus: "PAID", // Assume paid if contract exists
-                  vehiclePrice: finalPrice,
+                  depositStatus: "IN_ESCROW", // Default, không hardcode "PAID"
+                  vehiclePrice: vehiclePrice,
                   remainingAmount: remainingAmount,
                   depositPercentage: depositPercentage,
-                  appointmentType: contract.transaction.appointmentType,
                 }
               : prev.transaction;
 
@@ -436,7 +470,7 @@ const AppointmentManagement: React.FC = () => {
               transaction: transactionInfo,
             };
           });
-          console.log("✅ Updated vehicle and transaction from contract API");
+          console.log("✅ Updated vehicle and transaction from contract API (preserving original data)");
         }
 
         // Kiểm tra xem có photos ở đâu không
@@ -1546,20 +1580,21 @@ const AppointmentManagement: React.FC = () => {
                       ).toLocaleString("vi-VN")}{" "}
                       VNĐ
                     </p>
-                    <p className="text-gray-700">
-                      <span className="font-medium">Trạng thái cọc:</span>{" "}
-                      <span
-                        className={`font-semibold ${
-                          selectedAppointment.transaction?.depositStatus ===
-                          "PAID"
-                            ? "text-green-600"
-                            : "text-yellow-600"
-                        }`}
-                      >
-                        {selectedAppointment.transaction?.depositStatus ||
-                          "N/A"}
-                      </span>
-                    </p>
+                    {/* Hiển thị nhân viên xử lý chỉ khi COMPLETED */}
+                    {selectedAppointment.status === "COMPLETED" && (
+                      <p className="text-gray-700 mt-2">
+                        <span className="font-medium">Nhân viên xử lý:</span>{" "}
+                        {selectedAppointment.staff ? (
+                          <span className="font-semibold text-purple-600">
+                            {selectedAppointment.staff.name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic">
+                            Chưa phân công
+                          </span>
+                        )}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
