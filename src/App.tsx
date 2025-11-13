@@ -31,6 +31,7 @@ import AuctionListPage from "./pages/Auction/AuctionListPage";
 import AuctionDetailPage from "./pages/Auction/AuctionDetailPage";
 import AuctionCreatePage from "./pages/Auction/AuctionCreatePage";
 import AppointmentDetailPage from "./pages/AppointmentDetailPage"; // nếu chưa có thì có thể xoá import này
+import TransactionDetailPage from "./pages/TransactionDetailPage";
 
 // 🔽 bọc App bằng SocketProvider để bật realtime
 import { SocketProvider } from "./contexts/SocketContext";
@@ -131,6 +132,16 @@ function App() {
                       element={
                         <ProtectedRoute>
                           <AppointmentDetailPage />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* 🔥 ROUTES GIAO DỊCH */}
+                    <Route
+                      path="/transactions/:transactionId"
+                      element={
+                        <ProtectedRoute>
+                          <TransactionDetailPage />
                         </ProtectedRoute>
                       }
                     />
