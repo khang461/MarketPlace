@@ -28,24 +28,17 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-  };
-
-  const toggleDropdown = () => {
-    setDropdownOpen(!dropdownOpen);
-  };
+  const toggleSidebar = () => setSidebarOpen((s) => !s);
+  const toggleDarkMode = () => setDarkMode((d) => !d);
+  const toggleDropdown = () => setDropdownOpen((o) => !o);
 
   const handleLogout = () => {
     logout();
     navigate("/signin");
   };
 
-  const isActive = (path: string) => location.pathname === path;
+  // Active: match cả route con
+  const isActive = (path: string) => location.pathname.startsWith(path);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -64,6 +57,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
     };
   }, []);
 
+  // Sidebar menu items (KHÔNG CÒN CONTRACT)
   const sidebarItems = [
     { path: "/staff", icon: Home, label: "Trang chủ" },
     { path: "/staff/appointments", icon: Calendar, label: "Quản lý lịch hẹn" },
@@ -75,6 +69,10 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
     { path: "/staff/contracts", icon: FileText, label: "Hợp đồng" },
     { path: "/staff/users", icon: Users, label: "Quản lý người dùng" },
   ];
+
+  const initials =
+    (user?.fullName?.[0] || user?.name?.[0] || user?.email?.[0] || "S").toUpperCase();
+  const displayName = user?.fullName || user?.name || "Staff";
 
   return (
     <div
@@ -104,6 +102,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
             <button
               onClick={toggleDarkMode}
               className="p-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              aria-label="Toggle dark mode"
             >
               {darkMode ? (
                 <Sun className="w-5 h-5" />
@@ -122,19 +121,21 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
                     {user?.name?.charAt(0) || "S"}
                   </span>
                 </div>
-                <div className="text-left">
+                <div className="text-left hidden sm:block">
                   <div className="text-sm font-medium text-gray-900 dark:text-white">
                     {user?.name || "Staff"}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     Staff
                   </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Staff</div>
                 </div>
                 <ChevronDown className="w-4 h-4 text-gray-500" />
               </button>
 
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+                  {/* Shortcut to Users */}
                   <button
                     onClick={() => {
                       navigate("/staff/settings");
@@ -145,7 +146,9 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
                     <Settings className="w-4 h-4 mr-3" />
                     Cài đặt
                   </button>
+
                   <hr className="my-1 border-gray-200 dark:border-gray-700" />
+
                   <button
                     onClick={handleLogout}
                     className="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"

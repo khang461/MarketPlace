@@ -11,8 +11,9 @@ interface AuthContextType {
 
 interface User {
   id: string;
-  name: string;
+  name?: string;
   email: string;
+  fullName?: string;   // thêm
   avatar?: string;
   rating?: number;
   role?: string;

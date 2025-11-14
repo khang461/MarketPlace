@@ -41,12 +41,21 @@ const StaffDashboard: React.FC = () => {
     <StaffLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard Staff</h1>
-          <p className="text-gray-600 mt-1">Tổng quan hệ thống quản lý</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard Staff</h1>
+            <p className="text-gray-600 mt-1">Tổng quan hệ thống quản lý</p>
+          </div>
+          <button
+            onClick={fetchData}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Làm mới
+          </button>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats Cards — CHỈ dùng Users & Appointments, bỏ contract/doanh thu */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
@@ -69,8 +78,56 @@ const StaffDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
-            );
-          })}
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Tổng lịch hẹn</p>
+                <p className="text-2xl font-bold text-gray-900">{totalAppointments}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Chờ xử lý (CONFIRMED) */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center">
+              <div className="p-3 rounded-lg bg-yellow-100">
+                <Clock className="w-6 h-6 text-yellow-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Lịch hẹn chờ xử lý</p>
+                <p className="text-2xl font-bold text-gray-900">{countByStatus.CONFIRMED}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Đã hoàn thành */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center">
+              <div className="p-3 rounded-lg bg-green-100">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Lịch hẹn hoàn thành</p>
+                <p className="text-2xl font-bold text-gray-900">{countByStatus.COMPLETED}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Tổng người dùng + mới 7 ngày */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center">
+              <div className="p-3 rounded-lg bg-purple-100">
+                <UsersIcon className="w-6 h-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Người dùng</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {totalUsers}
+                  <span className="ml-2 text-sm font-medium text-purple-600">
+                    +{usersNew7d}/7 ngày
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Quick Actions */}
@@ -124,7 +181,7 @@ const StaffDashboard: React.FC = () => {
                   Quản lý phiên đấu giá chờ duyệt
                 </div>
               </div>
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -156,6 +213,22 @@ const StaffDashboard: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {activities.length === 0 ? (
+            <div className="text-sm text-gray-500">Chưa có hoạt động nào gần đây.</div>
+          ) : (
+            <div className="space-y-3">
+              {activities.map((act, idx) => (
+                <div key={idx} className="flex items-center p-3 bg-gray-50 rounded-lg">
+                  <div className={`w-2 h-2 rounded-full mr-3 ${act.color}`} />
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-900">{act.label}</p>
+                    <p className="text-xs text-gray-500">{timeFromNow(act.when)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </StaffLayout>
