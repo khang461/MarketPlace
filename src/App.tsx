@@ -29,6 +29,7 @@ import "./utils/websocketDebug"; // Load debug tools
 // 🔽 thêm 3 import cho phần đấu giá
 import AuctionListPage from "./pages/Auction/AuctionListPage";
 import AuctionDetailPage from "./pages/Auction/AuctionDetailPage";
+import StaffAuctionManagementPage from "./pages/Staff/StaffAuctionManagementPage";
 import AuctionCreatePage from "./pages/Auction/AuctionCreatePage";
 import AppointmentDetailPage from "./pages/AppointmentDetailPage"; // nếu chưa có thì có thể xoá import này
 import TransactionDetailPage from "./pages/TransactionDetailPage";
@@ -62,6 +63,14 @@ function App() {
             element={
               <ProtectedRoute requiredRole="staff">
                 <StaffAppointmentPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff/auction-management"
+            element={
+              <ProtectedRoute requiredRole="staff">
+                <StaffAuctionManagementPage />
               </ProtectedRoute>
             }
           />

@@ -18,11 +18,14 @@ import api from "../../config/api";
 import { getImageUrl } from "../../utils/imageHelper";
 
 /** =================== Utils =================== */
-type UIStatus = "PENDING" | "RUNNING" | "ENDED";
+type UIStatus = "PENDING" | "RUNNING" | "ENDED" | "CANCELLED";
 const mapStatus = (s: any): UIStatus => {
   const k = String(s ?? "").toLowerCase();
-  if (k === "active" || k === "running") return "RUNNING";
+  if (k === "cancelled") return "CANCELLED";
+  if (k === "active" || k === "running" || k === "ongoing") return "RUNNING";
   if (k === "ended" || k === "closed") return "ENDED";
+  if (k === "pending" || k === "upcoming" || k === "scheduled")
+    return "PENDING";
   return "PENDING";
 };
 
@@ -58,17 +61,24 @@ const fmtVND = (n?: number) =>
     ? n.toLocaleString("vi-VN") + "₫"
     : "0₫";
 
-const StatusBadge = ({ status }: { status: UIStatus | "ENDED" }) => {
+const StatusBadge = ({
+  status,
+}: {
+  status: UIStatus | "ENDED" | "CANCELLED";
+}) => {
   const map: Record<string, string> = {
     PENDING: "bg-amber-100 text-amber-700 border border-amber-200",
     RUNNING: "bg-emerald-100 text-emerald-700 border border-emerald-200",
     ENDED: "bg-gray-200 text-gray-700 border border-gray-300",
+    CANCELLED: "bg-red-100 text-red-700 border border-red-200",
   };
   const label =
     status === "RUNNING"
       ? "Đang diễn ra"
       : status === "ENDED"
       ? "Đã kết thúc"
+      : status === "CANCELLED"
+      ? "Đã hủy"
       : "Sắp diễn ra";
   return (
     <span
@@ -199,7 +209,10 @@ export default function AuctionDetailPage() {
     uiStatus === "ENDED" ||
     (!!auction && now >= new Date(auction.endAt).getTime());
 
-  const canBid = !isEnded && inWindow && uiStatus === "RUNNING" && !isSeller;
+  const isCancelled = auction?.status === "cancelled";
+
+  const canBid =
+    !isEnded && !isCancelled && inWindow && uiStatus === "RUNNING" && !isSeller;
 
   const currentPrice = useMemo(() => {
     if (!auction) return 0;
@@ -395,11 +408,17 @@ export default function AuctionDetailPage() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/0" />
             <div className="absolute bottom-3 left-3 right-3">
               <div className="flex items-center gap-2">
-                <StatusBadge status={isEnded ? "ENDED" : uiStatus} />
+                <StatusBadge
+                  status={
+                    isCancelled ? "CANCELLED" : isEnded ? "ENDED" : uiStatus
+                  }
+                />
                 <AuctionCountdown
                   startAt={auction.startAt}
                   endAt={auction.endAt}
-                  status={isEnded ? "ENDED" : uiStatus}
+                  status={
+                    isCancelled ? "CANCELLED" : isEnded ? "ENDED" : uiStatus
+                  }
                 />
               </div>
               <h1 className="mt-2 text-white text-xl md:text-2xl font-semibold drop-shadow">
@@ -490,13 +509,17 @@ export default function AuctionDetailPage() {
             <div className="text-sm text-gray-600">
               Trạng thái:
               <span className="ml-2">
-                <StatusBadge status={isEnded ? "ENDED" : uiStatus} />
+                <StatusBadge
+                  status={
+                    isCancelled ? "CANCELLED" : isEnded ? "ENDED" : uiStatus
+                  }
+                />
               </span>
             </div>
             <AuctionCountdown
               startAt={auction.startAt}
               endAt={auction.endAt}
-              status={isEnded ? "ENDED" : uiStatus}
+              status={isCancelled ? "CANCELLED" : isEnded ? "ENDED" : uiStatus}
             />
           </div>
           <div className="grid grid-cols-2 gap-3 pt-1">
@@ -515,8 +538,39 @@ export default function AuctionDetailPage() {
           </div>
         </div>
 
+        {/* Cancellation Reason */}
+        {isCancelled && auction.cancellationReason && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 shadow-sm p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-red-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-red-900 mb-1">
+                  Lý do hủy phiên đấu giá
+                </h3>
+                <p className="text-sm text-red-800">
+                  {auction.cancellationReason}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Result panel on desktop */}
-        {isEnded && (
+        {isEnded && !isCancelled && (
           <div className="hidden lg:block rounded-2xl border bg-white shadow-sm p-4 space-y-3">
             <ResultPanel
               auction={auction}
@@ -529,7 +583,16 @@ export default function AuctionDetailPage() {
 
         {/* Actions */}
         <div className="rounded-2xl border bg-white shadow-sm p-4 space-y-3">
-          {!sellerIdLoaded ? (
+          {isCancelled ? (
+            <div className="p-4 text-center">
+              <p className="text-red-600 font-medium">
+                Phiên đấu giá đã bị hủy
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                Không thể thực hiện thao tác
+              </p>
+            </div>
+          ) : !sellerIdLoaded ? (
             <div className="p-3 text-center text-gray-500">
               Đang kiểm tra quyền...
             </div>

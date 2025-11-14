@@ -184,6 +184,58 @@ export const getWonAuctionsPendingAppointment = async (params?: {
 export const getAllAuctions = (params?: {
   page?: number;
   limit?: number;
-  status?: "ongoing" | "upcoming" | "ended";
+  status?: "ongoing" | "upcoming" | "ended" | "cancelled";
   listingId?: string;
 }) => api.get("/auctions/all", { params });
+
+/**
+ * 11. Lấy danh sách phiên đấu giá của user hiện tại với filter
+ */
+export const getUserAuctions = (params?: { 
+  page?: number; 
+  limit?: number;
+  filter?: "pending" | "approved" | "upcoming" | "ongoing" | "ended" | "rejected";
+}) =>
+  api.get("/auctions/my-auctions", { params });
+
+// ============ STAFF/ADMIN APIs ============
+
+/**
+ * 12. Lấy tất cả phiên đấu giá với filter (STAFF/ADMIN)
+ */
+export const getAllAuctionsAdmin = (params?: { 
+  page?: number; 
+  limit?: number;
+  filter?: "pending" | "approved" | "upcoming" | "ongoing" | "ended" | "rejected";
+}) =>
+  api.get("/auctions/admin", { params });
+
+/**
+ * Legacy: Lấy danh sách phiên đấu giá chờ phê duyệt (STAFF/ADMIN)
+ */
+export const getPendingAuctions = (params?: { page?: number; limit?: number }) =>
+  api.get("/auctions/admin/pending", { params });
+
+/**
+ * 13. Phê duyệt phiên đấu giá (STAFF/ADMIN)
+ */
+export const approveAuction = (auctionId: string, payload: {
+  minParticipants: number;
+  maxParticipants: number;
+}) => api.post(`auctions/admin/${auctionId}/approve`, payload);
+
+/**
+ * 14. Từ chối phiên đấu giá (STAFF/ADMIN)
+ */
+export const rejectAuction = (auctionId: string, payload: {
+  reason: string;
+}) => api.post(`/auctions/${auctionId}/reject`, payload);
+
+/**
+ * 15. Cập nhật số lượng người tham gia (STAFF/ADMIN)
+ */
+export const updateParticipants = (auctionId: string, payload: {
+  minParticipants: number;
+  maxParticipants: number;
+}) => api.patch(`/auctions/${auctionId}/participants`, payload);
+
