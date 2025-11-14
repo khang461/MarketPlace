@@ -154,9 +154,187 @@ const ChatNotificationListener: React.FC = () => {
       }
     );
 
+    // ============= AUCTION EVENTS =============
+
+    // Listen for auction approved event (sent to seller)
+    socket.on(
+      "auction_approved",
+      (data: {
+        auctionId: string;
+        listingId: string;
+        minParticipants: number;
+        maxParticipants: number;
+        approvedBy: string;
+      }) => {
+        console.log("✅ Auction approved:", data);
+
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "success",
+          title: "Phiên đấu giá đã được phê duyệt",
+          text: `Số người tham gia: ${data.minParticipants}-${data.maxParticipants}`,
+          showConfirmButton: false,
+          timer: 5000,
+          timerProgressBar: true,
+          showCloseButton: true,
+          didOpen: (toast) => {
+            toast.addEventListener("click", () => {
+              navigate(`/auctions/${data.auctionId}`);
+              Swal.close();
+            });
+          },
+        });
+
+        NotificationManager.showMessageNotification(
+          "Phiên đấu giá đã được phê duyệt",
+          `Số người tham gia: ${data.minParticipants}-${data.maxParticipants}`,
+          {
+            onlyWhenHidden: true,
+            onClick: () => {
+              navigate(`/auctions/${data.auctionId}`);
+            },
+          }
+        );
+      }
+    );
+
+    // Listen for auction rejected event (sent to seller)
+    socket.on(
+      "auction_rejected",
+      (data: { auctionId: string; listingId: string; reason: string }) => {
+        console.log("❌ Auction rejected:", data);
+
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "error",
+          title: "Phiên đấu giá bị từ chối",
+          text: data.reason,
+          showConfirmButton: false,
+          timer: 6000,
+          timerProgressBar: true,
+          showCloseButton: true,
+          didOpen: (toast) => {
+            toast.addEventListener("click", () => {
+              navigate(`/auctions/${data.auctionId}`);
+              Swal.close();
+            });
+          },
+        });
+
+        NotificationManager.showMessageNotification(
+          "Phiên đấu giá bị từ chối",
+          data.reason,
+          {
+            onlyWhenHidden: true,
+            onClick: () => {
+              navigate(`/auctions/${data.auctionId}`);
+            },
+          }
+        );
+      }
+    );
+
+    // Listen for new auction available (broadcast to all buyers)
+    socket.on(
+      "new_auction_available",
+      (data: {
+        auctionId: string;
+        listingId: {
+          _id: string;
+          make: string;
+          model: string;
+          year: number;
+          photos: string[];
+        };
+        startTime: string;
+        endTime: string;
+      }) => {
+        console.log("🆕 New auction available:", data);
+
+        const vehicleTitle = `${data.listingId.make} ${data.listingId.model} ${data.listingId.year}`;
+
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "info",
+          title: "Phiên đấu giá mới",
+          text: vehicleTitle,
+          showConfirmButton: false,
+          timer: 5000,
+          timerProgressBar: true,
+          showCloseButton: true,
+          didOpen: (toast) => {
+            toast.addEventListener("click", () => {
+              navigate(`/auctions/${data.auctionId}`);
+              Swal.close();
+            });
+          },
+        });
+
+        NotificationManager.showMessageNotification(
+          "Phiên đấu giá mới",
+          vehicleTitle,
+          {
+            onlyWhenHidden: true,
+            onClick: () => {
+              navigate(`/auctions/${data.auctionId}`);
+            },
+          }
+        );
+      }
+    );
+
+    // Listen for auction cancelled event
+    socket.on(
+      "auction_cancelled",
+      (data: {
+        auctionId: string;
+        listingId: string;
+        reason: string;
+        refundProcessed: boolean;
+      }) => {
+        console.log("🚫 Auction cancelled:", data);
+
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "warning",
+          title: "Phiên đấu giá đã bị hủy",
+          text: data.reason,
+          showConfirmButton: false,
+          timer: 6000,
+          timerProgressBar: true,
+          showCloseButton: true,
+          didOpen: (toast) => {
+            toast.addEventListener("click", () => {
+              navigate(`/auctions/${data.auctionId}`);
+              Swal.close();
+            });
+          },
+        });
+
+        NotificationManager.showMessageNotification(
+          "Phiên đấu giá đã bị hủy",
+          data.reason,
+          {
+            onlyWhenHidden: true,
+            onClick: () => {
+              navigate(`/auctions/${data.auctionId}`);
+            },
+          }
+        );
+      }
+    );
+
     return () => {
       socket.off("new_message");
       socket.off("chat_list_update");
+      socket.off("auction_approved");
+      socket.off("auction_rejected");
+      socket.off("new_auction_available");
+      socket.off("auction_cancelled");
     };
   }, [socket, isConnected, user, navigate, location.pathname]);
 

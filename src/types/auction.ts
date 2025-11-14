@@ -1,18 +1,23 @@
 // src/types/auction.ts
 
 /** Trạng thái theo API (BE) */
-export type AuctionStatusApi = "active" | "scheduled" | "ended" | "closed";
+export type AuctionStatusApi = "active" | "scheduled" | "ended" | "closed" | "cancelled" | "pending" | "ongoing" | "upcoming";
 
 /** Trạng thái dùng trong UI cũ */
-export type AuctionStatusUI = "RUNNING" | "PENDING" | "ENDED";
+export type AuctionStatusUI = "RUNNING" | "PENDING" | "ENDED" | "CANCELLED";
 
 /** Map từ status API -> status UI */
 export const mapAuctionStatus = (s: AuctionStatusApi): AuctionStatusUI => {
   switch (s) {
     case "active":
+    case "ongoing":
       return "RUNNING";
     case "scheduled":
+    case "pending":
+    case "upcoming":
       return "PENDING";
+    case "cancelled":
+      return "CANCELLED";
     case "ended":
     case "closed":
       return "ENDED";

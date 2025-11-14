@@ -7,8 +7,8 @@ import type { Listing } from "../../types/account";
 
 type FormState = {
   listingId: string;
-  startAt: string;       // datetime-local format (YYYY-MM-DDTHH:mm)
-  endAt: string;         // datetime-local format
+  startAt: string; // datetime-local format (YYYY-MM-DDTHH:mm)
+  endAt: string; // datetime-local format
   startingPrice: number;
   depositAmount: number; // chỉ hiển thị UI, KHÔNG gửi lên /auctions
 };
@@ -168,7 +168,12 @@ export default function AuctionCreatePage() {
       const id = data?._id || data?.id;
 
       if (id) {
-        nav(`/auctions/${id}`);
+        // Phiên đấu giá mới tạo sẽ ở trạng thái pending, chờ staff duyệt
+        // Chuyển về trang account/auctions để xem trạng thái
+        setMsg("✅ Tạo phiên đấu giá thành công! Đang chờ staff phê duyệt.");
+        setTimeout(() => {
+          nav("/account?tab=auctions");
+        }, 2000);
       } else {
         setMsg("Tạo phiên thành công nhưng không nhận được ID.");
       }
@@ -186,8 +191,8 @@ export default function AuctionCreatePage() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Tạo phiên đấu giá</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Chọn xe đã được duyệt và thiết lập thời gian &amp; giá khởi điểm. Giá khởi điểm phải{" "}
-          <span className="font-medium">≥ 80% giá trị xe</span>.
+          Chọn xe đã được duyệt và thiết lập thời gian &amp; giá khởi điểm. Giá
+          khởi điểm phải <span className="font-medium">≥ 80% giá trị xe</span>.
         </p>
       </div>
 
@@ -254,7 +259,10 @@ export default function AuctionCreatePage() {
       </div>
 
       {/* Card: form thông tin phiên */}
-      <form onSubmit={submit} className="rounded-xl border bg-white shadow-sm p-4 space-y-5">
+      <form
+        onSubmit={submit}
+        className="rounded-xl border bg-white shadow-sm p-4 space-y-5"
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Bắt đầu</label>
@@ -303,7 +311,8 @@ export default function AuctionCreatePage() {
                 <span className="text-gray-600">
                   Tối thiểu:{" "}
                   <span className="font-medium">
-                    {fmtVND(minStartingPrice)} (80% của {fmtVND(selectedListing.priceListed)})
+                    {fmtVND(minStartingPrice)} (80% của{" "}
+                    {fmtVND(selectedListing.priceListed)})
                   </span>
                 </span>
               ) : (
@@ -350,7 +359,13 @@ export default function AuctionCreatePage() {
         </div>
 
         {msg && (
-          <div className="text-sm text-amber-700 mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <div
+            className={`text-sm mt-2 rounded-lg px-3 py-2 ${
+              msg.includes("✅")
+                ? "text-green-700 bg-green-50 border border-green-200"
+                : "text-amber-700 bg-amber-50 border border-amber-200"
+            }`}
+          >
             {msg}
           </div>
         )}

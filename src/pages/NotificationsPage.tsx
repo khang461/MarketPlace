@@ -242,6 +242,14 @@ const NotificationsPage: React.FC = () => {
         return "📝";
       case "system":
         return "⚙️";
+      case "auction_approved":
+        return "✅";
+      case "auction_rejected":
+        return "❌";
+      case "new_auction":
+        return "🆕";
+      case "auction_cancelled":
+        return "🚫";
       default:
         return "🔔";
     }

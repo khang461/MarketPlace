@@ -12,9 +12,8 @@ function fmt(ms: number) {
   return `${m}m ${sec}s`;
 }
 
-
-type StatusUI = "PENDING" | "RUNNING" | "ENDED";
-type StatusApi = "active" | "scheduled" | "ended" | "closed";
+type StatusUI = "PENDING" | "RUNNING" | "ENDED" | "CANCELLED";
+type StatusApi = "active" | "scheduled" | "ended" | "closed" | "cancelled";
 
 function normalizeStatus(
   start: number,
@@ -31,7 +30,10 @@ function normalizeStatus(
     case "PENDING":
     case "RUNNING":
     case "ENDED":
+    case "CANCELLED":
       return status;
+    case "cancelled":
+      return "CANCELLED";
     case "active":
       return "RUNNING";
     case "scheduled":
@@ -39,12 +41,13 @@ function normalizeStatus(
     case "ended":
     case "closed":
       return "ENDED";
-    default:
-      // fallback theo thời gian
-      { const now = Date.now();
+    default: // fallback theo thời gian
+    {
+      const now = Date.now();
       if (now < start) return "PENDING";
       if (now <= end) return "RUNNING";
-      return "ENDED"; }
+      return "ENDED";
+    }
   }
 }
 
@@ -78,6 +81,7 @@ export default function AuctionCountdown({
     const end = new Date(endAt).getTime();
     const st = normalizeStatus(start, end, status);
 
+    if (st === "CANCELLED") return "Đã hủy";
     if (st === "ENDED") return "Đã kết thúc";
     if (now < start) return `Bắt đầu sau ${fmt(start - now)}`;
     if (now < end) return `Còn lại ${fmt(end - now)}`;
