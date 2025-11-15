@@ -34,6 +34,7 @@ function pickAmount(d?: any): number | undefined {
   if (typeof d.amount === "number") return d.amount;
   if (typeof d.deposit?.depositAmount === "number")
     return d.deposit.depositAmount;
+  if (typeof d.depositAmount === "number") return d.depositAmount;
   return undefined;
 }
 
@@ -134,56 +135,85 @@ export default function DepositButton({
     if (loading || isSeller || isEnded) return;
     setLoading(true);
     setMsg("");
+
     try {
       const response = await createAuctionDeposit(auctionId);
-      const data = response?.data || response;
+      const data = response?.data ?? response;
 
-      // Đặt cọc thành công
-      if (data.success === true) {
-        await refresh();
+      // Nếu API dạng ví/VPBank trả về thiếu tiền ngay trong 2xx
+      if (
+        data &&
+        (data.success === false || data.requiredAmount || data.vnpayUrl)
+      ) {
+        const requiredAmount =
+          data.requiredAmount ??
+          data.depositAmount ??
+          pickAmount(data) ??
+          1_000_000;
+        const currentBalance = data.currentBalance ?? 0;
+
+        setTopupData({
+          requiredAmount,
+          currentBalance,
+          vnpayUrl: data.vnpayUrl,
+          message:
+            data.message || "Số dư trong ví không đủ để đặt cọc tham gia.",
+        });
+        setTopupOpen(true);
+        return;
+      }
+
+      // Trường hợp BE như hiện tại: trả thẳng document deposit
+      const depositDoc = data?.deposit || data;
+      if (depositDoc && depositDoc._id) {
+        const amt =
+          depositDoc.depositAmount ??
+          depositDoc.amount ??
+          pickAmount(depositDoc);
+
+        setUi("has");
+        if (typeof amt === "number") setAmount(amt);
+        onChanged?.("has");
+
         await Swal.fire({
           icon: "success",
           title: "Đặt cọc thành công!",
           text: "Bạn đã đặt cọc thành công. Có thể tham gia đấu giá.",
           confirmButtonColor: "#10b981",
         });
-      } else if (
-        data.success === false ||
-        data.vnpayUrl ||
-        data.requiredAmount
-      ) {
-        // Thiếu tiền -> mở modal nạp tiền
-        const requiredAmount = data.requiredAmount || 1000000;
-        const currentBalance = data.currentBalance || 0;
-        setTopupData({
-          requiredAmount,
-          currentBalance,
-          vnpayUrl: data.vnpayUrl,
-          message: data.message || "Số dư trong ví không đủ để đặt cọc",
-        });
-        setTopupOpen(true);
       } else {
-        setMsg(data.message || "Không thể đặt cọc. Vui lòng thử lại.");
+        // fallback: không rõ format -> cứ refresh lại trạng thái
+        await refresh();
+        await Swal.fire({
+          icon: "success",
+          title: "Đặt cọc thành công!",
+          text: "Đã cập nhật trạng thái đặt cọc.",
+          confirmButtonColor: "#10b981",
+        });
       }
     } catch (e: any) {
       const errorData = e?.response?.data;
 
-      // Trường hợp số dư không đủ (có vnpayUrl hoặc requiredAmount)
+      // Trường hợp số dư không đủ nhưng trả trong 4xx, kèm vnpayUrl / requiredAmount
       if (errorData && (errorData.vnpayUrl || errorData.requiredAmount)) {
-        const requiredAmount = errorData.requiredAmount || 1000000;
-        const currentBalance = errorData.currentBalance || 0;
+        const requiredAmount =
+          errorData.requiredAmount ??
+          errorData.depositAmount ??
+          1_000_000;
+        const currentBalance = errorData.currentBalance ?? 0;
+
         setTopupData({
           requiredAmount,
           currentBalance,
           vnpayUrl: errorData.vnpayUrl,
-          message: errorData.message || "Số dư trong ví không đủ để đặt cọc",
+          message:
+            errorData.message || "Số dư trong ví không đủ để đặt cọc tham gia.",
         });
         setTopupOpen(true);
-        if (mountedRef.current) setLoading(false);
         return;
       }
 
-      // Trường hợp duplicate key
+      // duplicate key / đã có cọc
       if (isDuplicateErr(e)) {
         await refresh();
         setMsg(
@@ -252,9 +282,6 @@ export default function DepositButton({
     );
   }
 
-  // Chưa load xong
-  if (ui === "unknown") return null;
-
   // Phiên đã kết thúc: chỉ hiển thị trạng thái
   if (isEnded) {
     return (
@@ -262,7 +289,14 @@ export default function DepositButton({
         {hasDeposit ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
             {/* check icon */}
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="h-4 w-4"
+            >
+              <path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" />
+            </svg>
             Đã đặt cọc
             {typeof amount === "number"
               ? ` (${amount.toLocaleString("vi-VN")}₫)`
@@ -288,12 +322,29 @@ export default function DepositButton({
               onClick={handleCancel}
               disabled={loading}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-60"
-              title="Chỉ hủy được trước khi phiên bắt đầu"
+              title="Chỉ hủy được trước khi phiên đã bắt đầu"
             >
               {loading && (
-                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.2" strokeWidth="4" />
-                  <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" />
+                <svg
+                  className="h-4 w-4 animate-spin"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeOpacity="0.2"
+                    strokeWidth="4"
+                  />
+                  <path
+                    d="M22 12a10 10 0 0 1-10 10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
                 </svg>
               )}
               {loading ? "Đang hủy…" : "Hủy đặt cọc"}
@@ -303,7 +354,14 @@ export default function DepositButton({
               className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700"
               title="Không thể hủy sau khi phiên đã bắt đầu"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="h-4 w-4"
+              >
+                <path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" />
+              </svg>
               Đã đặt cọc
               {typeof amount === "number"
                 ? ` (${amount.toLocaleString("vi-VN")}₫)`
@@ -317,16 +375,35 @@ export default function DepositButton({
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:opacity-60"
           >
             {loading && (
-              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.2" strokeWidth="4" />
-                <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" />
+              <svg
+                className="h-4 w-4 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeOpacity="0.2"
+                  strokeWidth="4"
+                />
+                <path
+                  d="M22 12a10 10 0 0 1-10 10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
               </svg>
             )}
             {loading ? "Đang xử lý…" : "Đặt cọc để tham gia"}
           </button>
         )}
 
-        {msg && <span className="text-xs font-medium text-amber-700">{msg}</span>}
+        {msg && (
+          <span className="text-xs font-medium text-amber-700">{msg}</span>
+        )}
       </div>
 
       {/* Modal nạp tiền */}
@@ -392,7 +469,9 @@ function TopupModal({
         <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl ring-1 ring-black/5">
           <div className="p-5">
             <h3 className="text-lg font-semibold">Số dư không đủ</h3>
-            {data.message && <p className="mt-1 text-sm text-gray-600">{data.message}</p>}
+            {data.message && (
+              <p className="mt-1 text-sm text-gray-600">{data.message}</p>
+            )}
 
             <div className="mt-4 space-y-3 rounded-lg border bg-gray-50 p-4">
               <div className="flex items-center justify-between">

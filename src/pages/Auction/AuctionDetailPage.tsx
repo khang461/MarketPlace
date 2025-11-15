@@ -19,15 +19,6 @@ import { getImageUrl } from "../../utils/imageHelper";
 
 /** =================== Utils =================== */
 type UIStatus = "PENDING" | "RUNNING" | "ENDED" | "CANCELLED";
-const mapStatus = (s: any): UIStatus => {
-  const k = String(s ?? "").toLowerCase();
-  if (k === "cancelled") return "CANCELLED";
-  if (k === "active" || k === "running" || k === "ongoing") return "RUNNING";
-  if (k === "ended" || k === "closed") return "ENDED";
-  if (k === "pending" || k === "upcoming" || k === "scheduled")
-    return "PENDING";
-  return "PENDING";
-};
 
 function topBid(a: Auction | null): Bid | null {
   if (!a?.bids?.length) return null;
@@ -88,6 +79,32 @@ const StatusBadge = ({
     </span>
   );
 };
+
+/** Lấy userId dạng string từ 1 bid để so sánh */
+function extractBidUserId(b: Bid | any): string | null {
+  if (!b) return null;
+  // userId có thể là string hoặc object
+  if (typeof b.userId === "string") return b.userId;
+  if (b.userId && typeof b.userId === "object") {
+    const u = b.userId as any;
+    return (
+      u._id?.toString() ||
+      u.id?.toString() ||
+      u.userId?.toString() ||
+      null
+    );
+  }
+  if (b.user && typeof b.user === "object") {
+    const u = b.user as any;
+    return (
+      u._id?.toString() ||
+      u.id?.toString() ||
+      u.userId?.toString() ||
+      null
+    );
+  }
+  return null;
+}
 
 export default function AuctionDetailPage() {
   const { auctionId = "" } = useParams();
@@ -192,8 +209,39 @@ export default function AuctionDetailPage() {
     };
   }, [auctionId, isConnected, on, off, joinAuction, leaveAuction, load]);
 
-  // ===== Derivations =====
-  const uiStatus: UIStatus = mapStatus(auction?.status);
+  // ===== Tính trạng thái UI dựa trên status + thời gian =====
+  const uiStatus: UIStatus = useMemo(() => {
+    if (!auction) return "PENDING";
+
+    const raw = String(
+      (auction as any).displayStatus ?? auction.status ?? ""
+    ).toLowerCase();
+
+    const now = Date.now();
+    const start = new Date(auction.startAt).getTime();
+    const end = new Date(auction.endAt).getTime();
+
+    // Ưu tiên cancelled
+    if (raw === "cancelled") return "CANCELLED";
+
+    // Ưu tiên ended / hết giờ
+    if (raw === "ended" || raw === "closed") return "ENDED";
+    if (now >= end) return "ENDED";
+
+    // Đang diễn ra theo status
+    if (raw === "active" || raw === "running" || raw === "ongoing") {
+      return "RUNNING";
+    }
+
+    // Đang diễn ra theo thời gian (status vẫn là 'approved')
+    if (now >= start && now < end) {
+      return "RUNNING";
+    }
+
+    // Còn lại: chưa đến giờ
+    return "PENDING";
+  }, [auction]);
+
   const isSeller = useMemo(
     () => !!me && !!sellerId && String(me) === String(sellerId),
     [me, sellerId]
@@ -209,7 +257,8 @@ export default function AuctionDetailPage() {
     uiStatus === "ENDED" ||
     (!!auction && now >= new Date(auction.endAt).getTime());
 
-  const isCancelled = auction?.status === "cancelled";
+  const isCancelled =
+    uiStatus === "CANCELLED" || auction?.status === "cancelled";
 
   const canBid =
     !isEnded && !isCancelled && inWindow && uiStatus === "RUNNING" && !isSeller;
@@ -264,10 +313,7 @@ export default function AuctionDetailPage() {
   // Kiểm tra winner - userId có thể là string hoặc object
   const isMeWinner = useMemo(() => {
     if (!winnerBid || !me) return false;
-    const winnerUserId =
-      typeof (winnerBid as any).userId === "string"
-        ? (winnerBid as any).userId
-        : (winnerBid as any).userId?._id || (winnerBid as any).userId?.id;
+    const winnerUserId = extractBidUserId(winnerBid);
     return !!winnerUserId && String(winnerUserId) === String(me);
   }, [winnerBid, me]);
 
@@ -282,6 +328,19 @@ export default function AuctionDetailPage() {
         : prev
     );
   };
+
+  /** ====== xử lý lịch sử đấu giá top 10 giá cao nhất ====== */
+  const topBids = useMemo(() => {
+    if (!auction?.bids?.length) return [];
+    // sắp xếp theo giá cao → thấp, lấy 10 người đầu
+    const byPrice = [...auction.bids].sort((a, b) => b.price - a.price);
+    return byPrice.slice(0, 10);
+  }, [auction]);
+
+  const currentTopUserId = useMemo(() => {
+    if (!topBids.length) return null;
+    return extractBidUserId(topBids[0]);
+  }, [topBids]);
 
   /** ====== Deposit amount & confirmation flow ====== */
   const depositAmount = useMemo(() => {
@@ -480,7 +539,11 @@ export default function AuctionDetailPage() {
         <div className="rounded-2xl border bg-white shadow-sm p-4">
           <h3 className="font-semibold mb-3">Lịch sử đấu giá</h3>
           {auction.bids?.length ? (
-            <AuctionHistory bids={auction.bids ?? []} />
+            <AuctionHistory
+              bids={topBids as any}
+              topUserId={currentTopUserId || undefined}
+              meId={me}
+            />
           ) : (
             <div className="rounded-lg border border-dashed p-6 text-center text-gray-500">
               Chưa có lượt đấu giá nào.
@@ -605,8 +668,8 @@ export default function AuctionDetailPage() {
                   {fmtVND(depositAmount)}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
-                  Số tiền sẽ được hoàn lại theo chính sách nếu phiên không thành
-                  công hoặc bạn không thắng (tuỳ điều khoản).
+                  Số tiền sẽ được hoàn lại theo chính sách nếu phiên không
+                  thành công hoặc bạn không thắng (tuỳ điều khoản).
                 </div>
               </div>
 
@@ -680,7 +743,8 @@ export default function AuctionDetailPage() {
                   Phiên đấu giá đã kết thúc.
                   {winnerBid && (
                     <div className="mt-2">
-                      Vui lòng chờ người mua tạo lịch hẹn để hoàn tất giao dịch.
+                      Vui lòng chờ người mua tạo lịch hẹn để hoàn tất giao
+                      dịch.
                     </div>
                   )}
                 </div>

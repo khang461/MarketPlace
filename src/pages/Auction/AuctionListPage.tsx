@@ -42,6 +42,7 @@ function pickItems(payload: any): Auction[] {
   return [];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const statusMap: Record<
   TabKey,
   "ongoing" | "upcoming" | "ended" | "cancelled"
@@ -75,12 +76,13 @@ export default function AuctionListPage() {
         let respAll: any | undefined;
         let arr: Auction[] = [];
 
-        // 1) endpoint hợp nhất nếu có
+        // 1) endpoint hợp nhất: lấy TẤT CẢ, để FE tự lọc theo thời gian & status
         try {
           const { data } = await getAllAuctions({
             page: 1,
             limit: 50,
-            status: statusMap[status],
+            // KHÔNG truyền status ở đây nữa, tránh BE lọc sai tab
+            // status: statusMap[status],
           });
           respAll = data;
           arr = pickItems(respAll);
@@ -100,7 +102,7 @@ export default function AuctionListPage() {
           // fallback
         }
 
-        // 2) fallback theo từng tab
+        // 2) fallback theo từng tab (chỉ dùng khi API /all lỗi thật sự)
         let respEach: any;
         if (status === "RUNNING") {
           ({ data: respEach } = await getOngoingAuctions({
@@ -150,7 +152,7 @@ export default function AuctionListPage() {
     };
   }, [status]);
 
-  // Lọc theo ô tìm kiếm (BE đã lọc theo tab)
+  // Lọc theo ô tìm kiếm (BE đã trả về all, FE tự lọc theo tab + text)
   const filtered = useMemo(() => {
     const now = Date.now();
     let result = items;

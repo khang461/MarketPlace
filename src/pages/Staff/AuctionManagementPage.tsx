@@ -5,9 +5,9 @@ import {
   Clock,
   Users,
   Eye,
-  ChevronDown,
   Car,
 } from "lucide-react";
+import axios from "axios";
 import {
   getAllAuctionsAdmin,
   approveAuction,
@@ -75,6 +75,7 @@ const AuctionManagementPage: React.FC = () => {
 
   useEffect(() => {
     fetchAuctions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const fetchAuctions = async () => {
@@ -97,7 +98,26 @@ const AuctionManagementPage: React.FC = () => {
     }
   };
 
+  const getErrorMessage = (error: unknown, defaultMsg: string) => {
+    if (axios.isAxiosError(error)) {
+      const data = error.response?.data as any;
+      if (data?.message) return data.message;
+    }
+    if (error instanceof Error) return error.message;
+    return defaultMsg;
+  };
+
   const handleApprove = async (auction: AuctionData) => {
+    // Nếu không còn pending thì thôi, tránh gọi API thừa
+    if (auction.approvalStatus !== "pending") {
+      Swal.fire({
+        icon: "info",
+        title: "Thông báo",
+        text: "Phiên đấu giá này hiện không ở trạng thái chờ duyệt.",
+      });
+      return;
+    }
+
     const result = await Swal.fire({
       title: "Phê duyệt phiên đấu giá",
       html: `
@@ -158,13 +178,13 @@ const AuctionManagementPage: React.FC = () => {
           showConfirmButton: false,
         });
 
-        fetchPendingAuctions();
+        await fetchAuctions();
       } catch (error: unknown) {
         console.error("Error approving auction:", error);
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "Không thể phê duyệt phiên đấu giá";
+        const errorMessage = getErrorMessage(
+          error,
+          "Không thể phê duyệt phiên đấu giá"
+        );
         Swal.fire({
           icon: "error",
           title: "Lỗi",
@@ -175,6 +195,15 @@ const AuctionManagementPage: React.FC = () => {
   };
 
   const handleReject = async (auction: AuctionData) => {
+    if (auction.approvalStatus !== "pending") {
+      Swal.fire({
+        icon: "info",
+        title: "Thông báo",
+        text: "Phiên đấu giá này hiện không ở trạng thái chờ duyệt.",
+      });
+      return;
+    }
+
     const result = await Swal.fire({
       title: "Từ chối phiên đấu giá",
       html: `
@@ -222,13 +251,13 @@ const AuctionManagementPage: React.FC = () => {
           showConfirmButton: false,
         });
 
-        fetchPendingAuctions();
+        await fetchAuctions();
       } catch (error: unknown) {
         console.error("Error rejecting auction:", error);
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "Không thể từ chối phiên đấu giá";
+        const errorMessage = getErrorMessage(
+          error,
+          "Không thể từ chối phiên đấu giá"
+        );
         Swal.fire({
           icon: "error",
           title: "Lỗi",
@@ -272,7 +301,6 @@ const AuctionManagementPage: React.FC = () => {
   ];
 
   const getStatusBadge = (auction: AuctionData) => {
-    // Ưu tiên check status cancelled/ended trước
     if (auction.status === "cancelled") {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -349,7 +377,7 @@ const AuctionManagementPage: React.FC = () => {
 
   return (
     <>
-      {/* Header - Dark theme */}
+      {/* Header */}
       <div className="bg-gradient-to-r from-slate-800 to-slate-700 text-white p-6 rounded-lg shadow-md mb-6">
         <h1 className="text-2xl font-bold mb-1">Quản lý đấu giá</h1>
         <p className="text-slate-300 text-sm">
@@ -425,7 +453,8 @@ const AuctionManagementPage: React.FC = () => {
                           <div className="flex items-center">
                             <Car className="w-4 h-4 text-blue-600 mr-2" />
                             <div className="text-sm font-medium text-gray-900">
-                              {auction.listingId.make} {auction.listingId.model}{" "}
+                              {auction.listingId.make}{" "}
+                              {auction.listingId.model}{" "}
                               {auction.listingId.year}
                             </div>
                           </div>
@@ -582,7 +611,9 @@ const AuctionManagementPage: React.FC = () => {
                   </div>
                   {selectedAuction.minParticipants && (
                     <div>
-                      <p className="text-sm text-gray-500">Số người tham gia</p>
+                      <p className="text-sm text-gray-500">
+                        Số người tham gia
+                      </p>
                       <p className="font-semibold">
                         <Users className="inline w-4 h-4 mr-1" />
                         {selectedAuction.minParticipants} -{" "}
@@ -593,29 +624,31 @@ const AuctionManagementPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => {
-                    setShowDetailModal(false);
-                    handleApprove(selectedAuction);
-                  }}
-                  className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center"
-                >
-                  <CheckCircle className="w-5 h-5 mr-2" />
-                  Phê duyệt
-                </button>
-                <button
-                  onClick={() => {
-                    setShowDetailModal(false);
-                    handleReject(selectedAuction);
-                  }}
-                  className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center"
-                >
-                  <XCircle className="w-5 h-5 mr-2" />
-                  Từ chối
-                </button>
-              </div>
+              {/* Action Buttons trong modal – chỉ khi đang pending */}
+              {selectedAuction.approvalStatus === "pending" && (
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => {
+                      setShowDetailModal(false);
+                      handleApprove(selectedAuction);
+                    }}
+                    className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center"
+                  >
+                    <CheckCircle className="w-5 h-5 mr-2" />
+                    Phê duyệt
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowDetailModal(false);
+                      handleReject(selectedAuction);
+                    }}
+                    className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center"
+                  >
+                    <XCircle className="w-5 h-5 mr-2" />
+                    Từ chối
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

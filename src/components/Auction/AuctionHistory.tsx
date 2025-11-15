@@ -55,11 +55,35 @@ function getAvatar(b: AnyBid): string | undefined {
   return undefined;
 }
 
-export default function AuctionHistory({ bids }: { bids: AnyBid[] }) {
+/** Lấy userId “thật” của bid để so sánh với topUserId / meId */
+function getUserId(b: AnyBid): string | null {
+  if (b.user && (b.user._id || b.user.id || b.user.userId)) {
+    return safeText(b.user._id || b.user.id || b.user.userId);
+  }
+  if (typeof b.userId === "string") return b.userId;
+  if (b.userId && typeof b.userId === "object") {
+    const u = b.userId as AnyUser;
+    return safeText(u._id || u.id || u.userId);
+  }
+  return null;
+}
+
+interface AuctionHistoryProps {
+  bids: AnyBid[];
+  topUserId?: string;
+  meId?: string | null;
+}
+
+export default function AuctionHistory({
+  bids,
+  topUserId,
+  meId,
+}: AuctionHistoryProps) {
   if (!bids || bids.length === 0) {
     return <div className="text-sm text-gray-500">Chưa có lượt đấu giá</div>;
   }
 
+  // Sort theo thời gian mới nhất → cũ nhất
   const items = [...bids].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
@@ -72,23 +96,48 @@ export default function AuctionHistory({ bids }: { bids: AnyBid[] }) {
         const userKey = getUserKey(b);
         const key = b._id || `${userKey}-${b.createdAt}`;
 
+        const uid = getUserId(b);
+        const isTop =
+          !!topUserId && !!uid && String(uid) === String(topUserId);
+        const isMe = !!meId && !!uid && String(uid) === String(meId);
+
         return (
-          <li key={key} className="py-2 grid grid-cols-12 items-center gap-2">
+          <li
+            key={key}
+            className={`py-2 grid grid-cols-12 items-center gap-2 ${
+              isTop ? "bg-indigo-50" : ""
+            }`}
+          >
             <div className="col-span-6 flex items-center gap-2 min-w-0">
+              {isTop && (
+                <span className="text-amber-500 text-base" title="Cao nhất hiện tại">
+                  👑
+                </span>
+              )}
               {avatar ? (
                 <img src={avatar} className="w-6 h-6 rounded-full" alt="" />
               ) : (
                 <div className="w-6 h-6 rounded-full bg-gray-200" />
               )}
-              <span className="text-sm truncate">{displayName}</span>
+              <span
+                className={`text-sm truncate ${
+                  isMe ? "font-semibold text-indigo-700" : ""
+                }`}
+              >
+                {displayName}
+              </span>
             </div>
 
-            <div className="col-span-3 text-sm font-medium text-right">
+            <div
+              className={`col-span-3 text-sm font-medium text-right ${
+                isTop ? "text-emerald-700" : ""
+              }`}
+            >
               {Number(b.price).toLocaleString("vi-VN")}₫
             </div>
 
             <div className="col-span-3 text-xs text-gray-500 text-right">
-              {new Date(b.createdAt).toLocaleString()}
+              {new Date(b.createdAt).toLocaleString("vi-VN")}
             </div>
           </li>
         );
