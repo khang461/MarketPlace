@@ -4,7 +4,7 @@ import {
   Heart,
   Share2,
   MapPin,
-  Phone,
+  // Phone,
   MessageCircle,
   ChevronLeft,
   ChevronRight,
@@ -15,6 +15,8 @@ import api from "../config/api";
 import { getImageUrl } from "../utils/imageHelper";
 import { useAuth } from "../contexts/AuthContext";
 import Swal from "sweetalert2";
+import QRPaymentModal from "../components/QRPaymentModal";
+import { generateFullPaymentQR } from "../config/depositPaymentAPI";
 
 interface ListingDetail {
   _id: string;
@@ -57,6 +59,16 @@ const VehicleDetailPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [isDepositing, setIsDepositing] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrData, setQrData] = useState<{
+    qrCode: string;
+    paymentUrl?: string;
+    amount: number;
+    title: string;
+    description?: string;
+    orderId?: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchListingDetail = async () => {
@@ -167,6 +179,303 @@ const VehicleDetailPage: React.FC = () => {
     }
   };
 
+  // Helper function để hiển thị popup số dư không đủ
+  // const showInsufficientBalanceDialog = (
+  //   requiredAmount: number,
+  //   currentBalance: number,
+  //   missingAmount: number,
+  //   vnpayUrl: string
+  // ) => {
+  //   Swal.fire({
+  //     icon: "warning",
+  //     title: "Số dư không đủ",
+  //     html: `
+  //       <div class="text-left space-y-2">
+  //         <p>Tổng tiền cần đặt cọc: <strong class="text-blue-600">${formatPrice(
+  //           requiredAmount
+  //         )}</strong></p>
+  //         <p>Số dư hiện tại: <strong>${formatPrice(currentBalance)}</strong></p>
+  //         <div class="border-b pb-2 mb-2">
+  //           <p class="text-lg font-semibold text-orange-600">Bạn chỉ cần nạp thêm: <strong>${formatPrice(
+  //             missingAmount
+  //           )}</strong></p>
+  //         </div>
+  //         <p class="mt-3 text-gray-600">Bạn có muốn nạp trực tiếp <strong>${formatPrice(
+  //           missingAmount
+  //         )}</strong> vào ví để đặt cọc không?</p>
+  //       </div>
+  //     `,
+  //     showCancelButton: true,
+  //     confirmButtonText: "Nạp tiền",
+  //     cancelButtonText: "Hủy",
+  //     confirmButtonColor: "#2563eb",
+  //   }).then((result) => {
+  //     if (result.isConfirmed) {
+  //       // Redirect to VNPay để nạp tiền (chỉ nạp số tiền còn thiếu)
+  //       window.location.href = vnpayUrl;
+  //     }
+  //   });
+  // };
+
+  // const handleDeposit = async () => {
+  //   if (isDepositing) return;
+
+  //   if (!isAuthenticated) {
+  //     Swal.fire({
+  //       icon: "warning",
+  //       title: "Cần đăng nhập",
+  //       text: "Vui lòng đăng nhập để đặt cọc",
+  //       confirmButtonColor: "#2563eb",
+  //       showCancelButton: true,
+  //       confirmButtonText: "Đăng nhập",
+  //       cancelButtonText: "Hủy",
+  //     }).then((result) => {
+  //       if (result.isConfirmed) {
+  //         navigate("/signin");
+  //       }
+  //     });
+  //     return;
+  //   }
+
+  //   if (!id) return;
+
+  //   // Yêu cầu nhập số tiền đặt cọc
+  //   const { value: depositAmount } = await Swal.fire({
+  //     title: "Đặt cọc",
+  //     html: `
+  //       <p class="text-left mb-4">Giá xe: <strong>${formatPrice(
+  //         listing.priceListed
+  //       )}</strong></p>
+  //       <label class="block text-left mb-2">Số tiền đặt cọc (VND):</label>
+  //       <input
+  //         id="depositAmount"
+  //         type="number"
+  //         class="swal2-input"
+  //         placeholder="Nhập số tiền"
+  //         min="${Math.round(listing.priceListed * 0.1)}"
+  //         step="100000"
+  //       />
+  //       <p class="text-left mt-2 text-sm text-gray-500">Số tiền tối thiểu: ${formatPrice(
+  //         Math.round(listing.priceListed * 0.1)
+  //       )} (10% giá xe)</p>
+  //     `,
+  //     confirmButtonText: "Xác nhận",
+  //     cancelButtonText: "Hủy",
+  //     showCancelButton: true,
+  //     preConfirm: () => {
+  //       const amount = (
+  //         document.getElementById("depositAmount") as HTMLInputElement
+  //       ).value;
+  //       const minAmount = Math.round(listing.priceListed * 0.1); // 10% giá xe
+  //       if (!amount || parseInt(amount) < minAmount) {
+  //         Swal.showValidationMessage(
+  //           `Số tiền phải lớn hơn hoặc bằng ${formatPrice(
+  //             minAmount
+  //           )} (10% giá xe)`
+  //         );
+  //         return false;
+  //       }
+  //       return parseInt(amount);
+  //     },
+  //   });
+
+  //   if (!depositAmount) return;
+
+  //   setIsDepositing(true);
+
+  //   // Gọi API đặt cọc từ ví (không dùng QR)
+  //   try {
+  //     const response = await api.post("/deposits", {
+  //       listingId: id,
+  //       depositAmount: depositAmount,
+  //     });
+
+  //     if (response.data.success) {
+  //       // Đặt cọc thành công từ ví
+  //       Swal.fire({
+  //         icon: "success",
+  //         title: "Đặt cọc thành công!",
+  //         text:
+  //           response.data.message ||
+  //           "Yêu cầu đặt cọc của bạn đã được gửi đến người bán, xin hãy kiểm tra mục 「Yêu cầu đặt cọc」thường xuyên!",
+  //         confirmButtonColor: "#2563eb",
+  //       });
+  //     } else if (response.data.vnpayUrl) {
+  //       // Số dư không đủ, BE trả về URL VNPay để nạp tiền
+  //       const requiredAmount = response.data.requiredAmount || 0;
+  //       const currentBalance = response.data.currentBalance || 0;
+  //       const missingAmount =
+  //         response.data.missingAmount || requiredAmount - currentBalance;
+
+  //       showInsufficientBalanceDialog(
+  //         requiredAmount,
+  //         currentBalance,
+  //         missingAmount,
+  //         response.data.vnpayUrl || ""
+  //       );
+  //     } else {
+  //       // Lỗi khác
+  //       Swal.fire({
+  //         icon: "error",
+  //         title: "Lỗi",
+  //         text: response.data.message || "Không thể tạo yêu cầu đặt cọc",
+  //         confirmButtonColor: "#2563eb",
+  //       });
+  //     }
+  //   } catch (error: unknown) {
+  //     console.error("Error creating deposit:", error);
+  //     const axiosError = error as {
+  //       response?: {
+  //         data?: {
+  //           message?: string;
+  //           error?: string;
+  //           vnpayUrl?: string;
+  //           requiredAmount?: number;
+  //           currentBalance?: number;
+  //           missingAmount?: number;
+  //         };
+  //       };
+  //     };
+
+  //     // Kiểm tra nếu có vnpayUrl trong response lỗi
+  //     if (axiosError.response?.data?.vnpayUrl) {
+  //       const requiredAmount = axiosError.response.data.requiredAmount || 0;
+  //       const currentBalance = axiosError.response.data.currentBalance || 0;
+  //       const missingAmount =
+  //         axiosError.response.data.missingAmount ||
+  //         requiredAmount - currentBalance;
+
+  //       showInsufficientBalanceDialog(
+  //         requiredAmount,
+  //         currentBalance,
+  //         missingAmount,
+  //         axiosError.response.data.vnpayUrl || ""
+  //       );
+  //     } else if (
+  //       axiosError.response?.data?.error?.includes(
+  //         "freezeAmount is not a function"
+  //       )
+  //     ) {
+  //       // Lỗi backend - walletService không có freezeAmount function
+  //       Swal.fire({
+  //         icon: "error",
+  //         title: "Lỗi hệ thống",
+  //         html: `
+  //           <p>Xin lỗi, hệ thống đang gặp lỗi kỹ thuật.</p>
+  //           <p class="text-sm text-gray-500 mt-2">Vui lòng thử lại sau hoặc liên hệ bộ phận hỗ trợ.</p>
+  //         `,
+  //         confirmButtonColor: "#2563eb",
+  //       });
+  //     } else {
+  //       const errorMessage =
+  //         axiosError.response?.data?.message ||
+  //         axiosError.response?.data?.error ||
+  //         "Không thể tạo yêu cầu đặt cọc";
+  //       const errorDetail =
+  //         axiosError.response?.data?.error &&
+  //         axiosError.response.data.error !== errorMessage
+  //           ? `<p class="text-xs text-gray-500 mt-2">${axiosError.response.data.error}</p>`
+  //           : "";
+
+  //       Swal.fire({
+  //         icon: "error",
+  //         title: "Lỗi",
+  //         html: `
+  //           <p>${errorMessage}</p>
+  //           ${errorDetail}
+  //         `,
+  //         confirmButtonColor: "#2563eb",
+  //       });
+  //     }
+  //   } finally {
+  //     setIsDepositing(false);
+  //   }
+  // };
+
+  const handleFullPayment = async () => {
+    if (isDepositing) return;
+
+    if (!isAuthenticated) {
+      Swal.fire({
+        icon: "warning",
+        title: "Cần đăng nhập",
+        text: "Vui lòng đăng nhập để mua xe",
+        confirmButtonColor: "#2563eb",
+        showCancelButton: true,
+        confirmButtonText: "Đăng nhập",
+        cancelButtonText: "Hủy",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          navigate("/signin");
+        }
+      });
+      return;
+    }
+
+    if (!id) return;
+
+    // Xác nhận mua full
+    const result = await Swal.fire({
+      icon: "question",
+      title: "Xác nhận mua xe",
+      html: `
+        <p class="text-left mb-4">Bạn sẽ thanh toán toàn bộ số tiền:</p>
+        <p class="text-2xl font-bold text-blue-600 mb-4">${formatPrice(
+          listing.priceListed
+        )}</p>
+        <p class="text-sm text-gray-600">Bạn có chắc chắn muốn mua xe này không?</p>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "Xác nhận mua",
+      cancelButtonText: "Hủy",
+      confirmButtonColor: "#16a34a",
+    });
+
+    if (!result.isConfirmed) return;
+
+    setIsDepositing(true);
+
+    try {
+      const response = await generateFullPaymentQR({
+        listingId: id,
+      });
+
+      if (response.success && response.qrCode) {
+        // Hiển thị modal QR code
+        setQrData({
+          qrCode: response.qrCode,
+          paymentUrl: response.paymentUrl,
+          amount: response.fullAmount,
+          title: "Quét mã QR để thanh toán toàn bộ",
+          description: response.message,
+          orderId: response.orderId,
+        });
+        setQrModalOpen(true);
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Lỗi",
+          text: response.message || "Không thể tạo mã QR thanh toán",
+          confirmButtonColor: "#2563eb",
+        });
+      }
+    } catch (error: unknown) {
+      console.error("Error generating full payment QR:", error);
+      const axiosError = error as {
+        response?: { data?: { message?: string } };
+      };
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi",
+        text:
+          axiosError.response?.data?.message ||
+          "Không thể tạo mã QR thanh toán. Vui lòng thử lại!",
+        confirmButtonColor: "#2563eb",
+      });
+    } finally {
+      setIsDepositing(false);
+    }
+  };
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -388,6 +697,20 @@ const VehicleDetailPage: React.FC = () => {
                 <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
                   Liên hệ mua
                 </button>
+                {listing.status === "Published" &&
+                  user?.id !== listing.sellerId._id && (
+                    <button
+                      onClick={handleFullPayment}
+                      disabled={isDepositing}
+                      className={`w-full py-3 rounded-lg font-semibold transition-colors ${
+                        isDepositing
+                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          : "bg-green-600 text-white hover:bg-green-700"
+                      }`}
+                    >
+                      Mua ngay (Thanh toán toàn bộ)
+                    </button>
+                  )}
                 <button className="w-full border border-blue-600 text-blue-600 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2">
                   <Heart className="w-4 h-4" />
                   <span>Thêm vào yêu thích</span>
@@ -433,7 +756,6 @@ const VehicleDetailPage: React.FC = () => {
               {/* Chỉ hiển thị contact buttons nếu KHÔNG phải tin đăng của mình */}
               {user?.id !== listing.sellerId._id && (
                 <div className="space-y-3">
-                 
                   <button
                     onClick={handleStartChat}
                     className="w-full border border-green-600 text-green-600 py-3 rounded-lg font-semibold hover:bg-green-50 transition-colors flex items-center justify-center space-x-2"
@@ -447,14 +769,16 @@ const VehicleDetailPage: React.FC = () => {
               {/* Hiển thị badge nếu là tin đăng của mình */}
               {user?.id === listing.sellerId._id && (
                 <div className="text-center">
-                  <p className="text-blue-800 font-medium mb-2">Đây là tin đăng của bạn</p>
+                  <p className="text-blue-800 font-medium mb-2">
+                    Đây là tin đăng của bạn
+                  </p>
                   <button
-                  onClick={() =>
-                    navigate("/account", { state: { activeTab: "listings" } })
-                  }
-                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                    onClick={() =>
+                      navigate("/account", { state: { activeTab: "listings" } })
+                    }
+                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
                   >
-                  Quản lý tin đăng
+                    Quản lý tin đăng
                   </button>
                 </div>
               )}
@@ -528,6 +852,23 @@ const VehicleDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* QR Payment Modal */}
+      {qrData && (
+        <QRPaymentModal
+          isOpen={qrModalOpen}
+          onClose={() => {
+            setQrModalOpen(false);
+            setQrData(null);
+          }}
+          qrCode={qrData.qrCode}
+          paymentUrl={qrData.paymentUrl}
+          amount={qrData.amount}
+          title={qrData.title}
+          description={qrData.description}
+          orderId={qrData.orderId}
+        />
+      )}
     </div>
   );
 };
