@@ -11,6 +11,9 @@ import {
   XCircle,
 } from "lucide-react";
 import ImagePreviewModal from "../components/ImagePreviewModal";
+import QRPaymentModal from "../components/QRPaymentModal";
+import { generateRemainingPaymentQR } from "../config/depositPaymentAPI";
+import Swal from "sweetalert2";
 
 interface Transaction {
   id: string;
@@ -75,6 +78,16 @@ export default function TransactionDetailPage() {
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrData, setQrData] = useState<{
+    qrCode: string;
+    paymentUrl: string;
+    amount: number;
+    title: string;
+    description: string;
+    orderId?: string;
+  } | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const loadTransaction = async () => {
     if (!transactionId) return;
@@ -113,6 +126,59 @@ export default function TransactionDetailPage() {
     setPreviewImages(images);
     setPreviewIndex(index);
     setIsPreviewOpen(true);
+  };
+
+  const handleRemainingPayment = async () => {
+    if (!transaction || !transaction.depositRequest?.id) return;
+
+    setIsProcessingPayment(true);
+
+    try {
+      const response = await generateRemainingPaymentQR({
+        listingId: transaction.listing.id,
+        depositRequestId: transaction.depositRequest.id,
+      });
+
+      if (response.success && response.qrCode) {
+        setQrData({
+          qrCode: response.qrCode,
+          paymentUrl: response.paymentUrl,
+          amount: response.remainingAmount,
+          title: "Thanh toán số tiền còn lại",
+          description: `Thanh toán ${response.remainingAmount.toLocaleString(
+            "vi-VN"
+          )} VNĐ cho giao dịch mua xe`,
+          orderId: response.orderId,
+        });
+        setQrModalOpen(true);
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Lỗi",
+          text: response.message || "Không thể tạo QR code thanh toán",
+          confirmButtonColor: "#2563eb",
+        });
+      }
+    } catch (error: unknown) {
+      console.error("Error generating remaining payment QR:", error);
+      const axiosError = error as {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      };
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi",
+        text:
+          axiosError.response?.data?.message ||
+          "Không thể tạo QR code thanh toán",
+        confirmButtonColor: "#2563eb",
+      });
+    } finally {
+      setIsProcessingPayment(false);
+    }
   };
 
   if (loading) {
@@ -272,20 +338,102 @@ export default function TransactionDetailPage() {
               <DollarSign className="w-5 h-5 text-gray-500 mt-1" />
               <div className="flex-1">
                 <p className="font-semibold mb-3">Thông tin thanh toán</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-500 mb-1">Đặt cọc</p>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {transaction.amount.deposit.toLocaleString("vi-VN")} VNĐ
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-500 mb-1">Tổng giá trị</p>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {transaction.amount.total.toLocaleString("vi-VN")} VNĐ
-                    </p>
-                  </div>
-                </div>
+                {(() => {
+                  const { deposit, total, remaining } = transaction.amount;
+                  const hasDepositRequest = !!transaction.depositRequest;
+
+                  const tenPercentOfTotal = Math.round(total * 0.1);
+                  const ninetyPercentOfTotal = Math.round(total * 0.9);
+                  const isDepositTenPercent =
+                    Math.abs(deposit - tenPercentOfTotal) <= 1000;
+                  const isRemainingNinetyPercent =
+                    Math.abs(remaining - ninetyPercentOfTotal) <= 1000;
+
+                  const isFullPayment =
+                    !hasDepositRequest ||
+                    deposit === 0 ||
+                    remaining === 0 ||
+                    deposit === total ||
+                    (isDepositTenPercent &&
+                      isRemainingNinetyPercent &&
+                      transaction.status === "COMPLETED");
+
+                  if (isFullPayment) {
+                    return (
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="bg-green-50 rounded-lg p-4 border-2 border-green-200">
+                          <p className="text-xs text-gray-500 mb-1">
+                            Số tiền đã thanh toán
+                          </p>
+                          <p className="text-2xl font-bold text-green-700">
+                            {total.toLocaleString("vi-VN")} VNĐ
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Thanh toán toàn bộ
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Deposit case
+                  return (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                          <p className="text-xs text-gray-500 mb-1">
+                            Đã thanh toán (Đặt cọc)
+                            {total > 0 && (
+                              <span className="ml-1 text-blue-600">
+                                ({Math.round((deposit / total) * 100)}%)
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-lg font-semibold text-blue-700">
+                            {deposit.toLocaleString("vi-VN")} VNĐ
+                          </p>
+                        </div>
+                        <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
+                          <p className="text-xs text-gray-500 mb-1">
+                            Còn lại cần thanh toán
+                          </p>
+                          <p className="text-lg font-semibold text-orange-700">
+                            {remaining.toLocaleString("vi-VN")} VNĐ
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500 mb-1">
+                          Tổng giá trị giao dịch
+                        </p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {total.toLocaleString("vi-VN")} VNĐ
+                        </p>
+                      </div>
+                      {/* Button thanh toán số tiền còn lại - chỉ hiển thị cho buyer */}
+                      {isBuyer &&
+                        transaction.status === "PENDING" &&
+                        remaining > 0 &&
+                        transaction.depositRequest?.id && (
+                          <div className="mt-4">
+                            <button
+                              onClick={handleRemainingPayment}
+                              disabled={isProcessingPayment}
+                              className={`w-full py-3 rounded-lg font-semibold transition-colors ${
+                                isProcessingPayment
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  : "bg-green-600 text-white hover:bg-green-700"
+                              }`}
+                            >
+                              {isProcessingPayment
+                                ? "Đang xử lý..."
+                                : "Thanh toán số tiền còn lại"}
+                            </button>
+                          </div>
+                        )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -425,6 +573,23 @@ export default function TransactionDetailPage() {
         currentIndex={previewIndex}
         onNavigate={setPreviewIndex}
       />
+
+      {/* QR Payment Modal */}
+      {qrData && (
+        <QRPaymentModal
+          isOpen={qrModalOpen}
+          onClose={() => {
+            setQrModalOpen(false);
+            setQrData(null);
+          }}
+          qrCode={qrData.qrCode}
+          paymentUrl={qrData.paymentUrl}
+          amount={qrData.amount}
+          title={qrData.title}
+          description={qrData.description}
+          orderId={qrData.orderId}
+        />
+      )}
     </div>
   );
 }
