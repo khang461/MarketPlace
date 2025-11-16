@@ -26,7 +26,19 @@ import ChatSidebar from "../components/Chat/ChatSidebar";
 const ChatDetailPage: React.FC = () => {
   const { chatId } = useParams<{ chatId: string }>();
   const { user } = useAuth();
-  const { socket, isConnected } = useSocket();
+  const {
+    socket,
+    isConnected,
+    joinChat,
+    leaveChat,
+    sendMessage: sendMessageWs,
+    emitTypingStart,
+    emitTypingStop,
+    onNewMessage,
+    onUserTyping,
+    onUserStoppedTyping,
+    onContactStatusUpdate,
+  } = useSocket();
   const navigate = useNavigate();
   const location = useLocation();
   const [chat, setChat] = useState<Chat | null>(location.state?.chat || null);
@@ -84,105 +96,87 @@ const ChatDetailPage: React.FC = () => {
   useEffect(() => {
     if (!socket || !chatId) return;
 
-    // Join chat room (backend expects "join_chat")
-    socket.emit("join_chat", chatId);
-    console.log("📩 Joined chat room:", chatId);
+    // Join chat room
+    joinChat(chatId);
 
-    // Listen for new messages (backend emits "new_message")
-    socket.on("new_message", (message: Message) => {
+    // Listen for new messages
+    const handleNewMessage = (message: Message) => {
       console.log("💬 New message received:", message);
       setMessages((prev) => [...prev, message]);
 
       // Mark as read nếu đang xem chat này
       if (message.senderId._id !== user?.id) {
         markMessagesAsRead();
-
-        // KHÔNG hiển thị notification khi đang xem chính chat đó
-        // Chỉ hiển thị khi message từ chat khác hoặc khi tab bị ẩn
-        // Vì đang ở trong ChatDetailPage với chatId này rồi, không cần notification
         console.log(
           "✅ Message marked as read (no notification - already in chat)"
         );
       }
-    });
+    };
 
-    // Listen for typing indicator (backend emits "user_typing")
-    socket.on(
-      "user_typing",
-      ({
-        chatId: typingChatId,
-        typingUsers,
-      }: {
-        chatId: string;
-        typingUsers: Array<{
-          userId: string;
-          fullName: string;
-          avatar: string;
-        }>;
-      }) => {
-        if (typingChatId === chatId) {
-          console.log("⌨️ Users typing:", typingUsers);
-          // Check if anyone else is typing (not current user)
-          const othersTyping = typingUsers.filter((u) => u.userId !== user?.id);
-          setIsTyping(othersTyping.length > 0);
-        }
+    // Listen for typing indicator
+    const handleUserTyping = ({
+      chatId: typingChatId,
+      typingUsers,
+    }: {
+      chatId: string;
+      typingUsers: Array<{ userId: string; fullName: string; avatar: string }>;
+    }) => {
+      if (typingChatId === chatId) {
+        console.log("⌨️ Users typing:", typingUsers);
+        const othersTyping = typingUsers.filter((u) => u.userId !== user?.id);
+        setIsTyping(othersTyping.length > 0);
       }
-    );
+    };
 
-    // Listen for typing stopped (backend emits "user_stopped_typing")
-    socket.on(
-      "user_stopped_typing",
-      ({
-        chatId: typingChatId,
-        typingUsers,
-      }: {
-        chatId: string;
-        typingUsers: Array<{
-          userId: string;
-          fullName: string;
-          avatar: string;
-        }>;
-      }) => {
-        if (typingChatId === chatId) {
-          console.log("⌨️ Typing stopped, remaining:", typingUsers);
-          const othersTyping = typingUsers.filter((u) => u.userId !== user?.id);
-          setIsTyping(othersTyping.length > 0);
-        }
+    // Listen for typing stopped
+    const handleUserStoppedTyping = ({
+      chatId: typingChatId,
+      typingUsers,
+    }: {
+      chatId: string;
+      typingUsers: Array<{ userId: string; fullName: string; avatar: string }>;
+    }) => {
+      if (typingChatId === chatId) {
+        console.log("⌨️ Typing stopped, remaining:", typingUsers);
+        const othersTyping = typingUsers.filter((u) => u.userId !== user?.id);
+        setIsTyping(othersTyping.length > 0);
       }
-    );
+    };
 
-    // Listen for contact status updates (backend emits "contact_status_update")
-    socket.on(
-      "contact_status_update",
-      ({
-        chatId: updateChatId,
-        userId: onlineUserId,
-        isOnline,
-      }: {
-        chatId: string;
-        userId: string;
-        isOnline: boolean;
-      }) => {
-        if (updateChatId === chatId) {
-          console.log("🟢 Contact status update:", onlineUserId, isOnline);
-          setOnlineUsers((prev) => {
-            if (isOnline) {
-              return [...new Set([...prev, onlineUserId])];
-            } else {
-              return prev.filter((id) => id !== onlineUserId);
-            }
-          });
-        }
+    // Listen for contact status updates
+    const handleContactStatusUpdate = ({
+      chatId: updateChatId,
+      userId: onlineUserId,
+      isOnline,
+    }: {
+      chatId: string;
+      userId: string;
+      isOnline: boolean;
+    }) => {
+      if (updateChatId === chatId) {
+        console.log("🟢 Contact status update:", onlineUserId, isOnline);
+        setOnlineUsers((prev) => {
+          if (isOnline) {
+            return [...new Set([...prev, onlineUserId])];
+          } else {
+            return prev.filter((id) => id !== onlineUserId);
+          }
+        });
       }
-    );
+    };
+
+    onNewMessage(handleNewMessage);
+    onUserTyping(handleUserTyping);
+    onUserStoppedTyping(handleUserStoppedTyping);
+    onContactStatusUpdate(handleContactStatusUpdate);
 
     // Cleanup
     return () => {
-      socket.emit("leave_chat", chatId);
-      socket.off("new_message");
-      socket.off("user_typing");
-      socket.off("user_stopped_typing");
-      socket.off("contact_status_update");
+      leaveChat(chatId);
+      socket.off("new_message", handleNewMessage);
+      socket.off("user_typing", handleUserTyping);
+      socket.off("user_stopped_typing", handleUserStoppedTyping);
+      socket.off("contact_status_update", handleContactStatusUpdate);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, chatId, user?.id]);
@@ -438,8 +432,8 @@ const ChatDetailPage: React.FC = () => {
       } else {
         // Send text message qua socket (real-time)
         if (socket && isConnected) {
-          socket.emit("send_message", {
-            chatId,
+          sendMessageWs({
+            chatId: chatId!,
             content,
           });
 
@@ -449,7 +443,7 @@ const ChatDetailPage: React.FC = () => {
           if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
           }
-          socket.emit("typing_stop", { chatId });
+          emitTypingStop(chatId!);
         } else {
           // Fallback: gửi qua API nếu socket không kết nối
           const response = await api.post(`/chat/${chatId}/messages`, {
@@ -1242,9 +1236,14 @@ const ChatDetailPage: React.FC = () => {
                 onChange={(e) => {
                   setNewMessage(e.target.value);
 
-                  // Emit typing indicator (backend expects "typing_start")
-                  if (socket && isConnected && e.target.value.trim()) {
-                    socket.emit("typing_start", { chatId });
+                  // Emit typing indicator
+                  if (
+                    socket &&
+                    isConnected &&
+                    e.target.value.trim() &&
+                    chatId
+                  ) {
+                    emitTypingStart(chatId);
 
                     // Clear previous timeout
                     if (typingTimeoutRef.current) {
@@ -1253,11 +1252,16 @@ const ChatDetailPage: React.FC = () => {
 
                     // Set new timeout to stop typing after 2 seconds
                     typingTimeoutRef.current = setTimeout(() => {
-                      socket.emit("typing_stop", { chatId });
+                      emitTypingStop(chatId);
                     }, 2000);
-                  } else if (socket && isConnected && !e.target.value.trim()) {
+                  } else if (
+                    socket &&
+                    isConnected &&
+                    !e.target.value.trim() &&
+                    chatId
+                  ) {
                     // Stop typing if input is cleared
-                    socket.emit("typing_stop", { chatId });
+                    emitTypingStop(chatId);
                   }
                 }}
                 onPaste={handlePasteImage}

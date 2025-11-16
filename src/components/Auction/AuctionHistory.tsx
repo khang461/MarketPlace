@@ -1,4 +1,5 @@
 // src/components/Auction/AuctionHistory.tsx
+import { memo } from "react";
 import type { Bid } from "../../types/auction";
 
 type AnyUser = {
@@ -74,7 +75,7 @@ interface AuctionHistoryProps {
   meId?: string | null;
 }
 
-export default function AuctionHistory({
+const AuctionHistory = memo(function AuctionHistory({
   bids,
   topUserId,
   meId,
@@ -97,8 +98,7 @@ export default function AuctionHistory({
         const key = b._id || `${userKey}-${b.createdAt}`;
 
         const uid = getUserId(b);
-        const isTop =
-          !!topUserId && !!uid && String(uid) === String(topUserId);
+        const isTop = !!topUserId && !!uid && String(uid) === String(topUserId);
         const isMe = !!meId && !!uid && String(uid) === String(meId);
 
         return (
@@ -110,7 +110,10 @@ export default function AuctionHistory({
           >
             <div className="col-span-6 flex items-center gap-2 min-w-0">
               {isTop && (
-                <span className="text-amber-500 text-base" title="Cao nhất hiện tại">
+                <span
+                  className="text-amber-500 text-base"
+                  title="Cao nhất hiện tại"
+                >
                   👑
                 </span>
               )}
@@ -144,4 +147,6 @@ export default function AuctionHistory({
       })}
     </ul>
   );
-}
+});
+
+export default AuctionHistory;
