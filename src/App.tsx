@@ -40,6 +40,7 @@ import { SocketProvider } from "./contexts/SocketContext";
 import MyMembershipPage from "./pages/MyMembershipPage";
 import UpgradeMembershipPage from "./pages/UpgradeMembershipPage";
 import PaymentResultPage from "./pages/PaymentResultPage";
+import DepositPaymentResultPage from "./pages/DepositPaymentResultPage";
 
 function App() {
   return (
@@ -103,6 +104,14 @@ function App() {
                     <Route
                       path="/membership/payment-result"
                       element={<PaymentResultPage />}
+                    />
+                    <Route
+                      path="/payments"
+                      element={<PaymentResultPage />}
+                    />
+                    <Route
+                      path="/deposits"
+                      element={<DepositPaymentResultPage />}
                     />
                     <Route
                       path="/notifications-deposit"
