@@ -88,19 +88,13 @@ function extractBidUserId(b: Bid | any): string | null {
   if (b.userId && typeof b.userId === "object") {
     const u = b.userId as any;
     return (
-      u._id?.toString() ||
-      u.id?.toString() ||
-      u.userId?.toString() ||
-      null
+      u._id?.toString() || u.id?.toString() || u.userId?.toString() || null
     );
   }
   if (b.user && typeof b.user === "object") {
     const u = b.user as any;
     return (
-      u._id?.toString() ||
-      u.id?.toString() ||
-      u.userId?.toString() ||
-      null
+      u._id?.toString() || u.id?.toString() || u.userId?.toString() || null
     );
   }
   return null;
@@ -193,19 +187,72 @@ export default function AuctionDetailPage() {
     if (!auctionId || !isConnected) return;
     joinAuction?.(auctionId);
 
-    const refresh = () => load();
+    // Handler for instant bid updates - update state directly without API call
+    const handleBidUpdate = (data: any) => {
+      console.log("🔥 Instant bid update:", data);
 
-    on?.("auction_bid_update", refresh);
-    on?.("auction_closed", refresh);
-    on?.("auction:bidPlaced", refresh);
-    on?.("auction:ended", refresh);
+      // Update auction state immediately from WebSocket data
+      setAuction((prev) => {
+        if (!prev) return prev;
+
+        const newBid = data.bid || data.newBid;
+        if (!newBid) return prev;
+
+        // Add new bid to the list
+        const updatedBids = [...(prev.bids || []), newBid];
+
+        // Update current price
+        const newCurrentPrice = Math.max(
+          newBid.price,
+          prev.currentPrice || prev.startingPrice || 0
+        );
+
+        return {
+          ...prev,
+          bids: updatedBids,
+          currentPrice: newCurrentPrice,
+          // Update other fields if provided
+          ...(data.auction && {
+            status: data.auction.status || prev.status,
+            winnerId: data.auction.winnerId || prev.winnerId,
+          }),
+        };
+      });
+    };
+
+    // Handler for auction ended event
+    const handleAuctionEnded = (data: any) => {
+      console.log("🏁 Auction ended:", data);
+      setAuction((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          status: "ended",
+          winnerId: data.winnerId || data.auction?.winnerId || prev.winnerId,
+        };
+      });
+    };
+
+    // Handler for auction closed
+    const handleAuctionClosed = () => {
+      console.log("🔒 Auction closed");
+      load(); // Full reload for closed auctions
+    };
+
+    // Listen to all bid-related events
+    on?.("auction_bid_update", handleBidUpdate);
+    on?.("auction:bidPlaced", handleBidUpdate);
+    on?.("new_bid", handleBidUpdate);
+    on?.("auction:ended", handleAuctionEnded);
+    on?.("auction_closed", handleAuctionClosed);
 
     return () => {
       leaveAuction?.(auctionId);
-      off?.("auction_bid_update", refresh);
-      off?.("auction_closed", refresh);
-      off?.("auction:bidPlaced", refresh);
-      off?.("auction:ended", refresh);
+      off?.("auction_bid_update", handleBidUpdate);
+      off?.("auction:bidPlaced", handleBidUpdate);
+      off?.("new_bid", handleBidUpdate);
+      off?.("auction:ended", handleAuctionEnded);
+      off?.("auction_closed", handleAuctionClosed);
     };
   }, [auctionId, isConnected, on, off, joinAuction, leaveAuction, load]);
 
@@ -668,8 +715,8 @@ export default function AuctionDetailPage() {
                   {fmtVND(depositAmount)}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
-                  Số tiền sẽ được hoàn lại theo chính sách nếu phiên không
-                  thành công hoặc bạn không thắng (tuỳ điều khoản).
+                  Số tiền sẽ được hoàn lại theo chính sách nếu phiên không thành
+                  công hoặc bạn không thắng (tuỳ điều khoản).
                 </div>
               </div>
 
@@ -743,8 +790,7 @@ export default function AuctionDetailPage() {
                   Phiên đấu giá đã kết thúc.
                   {winnerBid && (
                     <div className="mt-2">
-                      Vui lòng chờ người mua tạo lịch hẹn để hoàn tất giao
-                      dịch.
+                      Vui lòng chờ người mua tạo lịch hẹn để hoàn tất giao dịch.
                     </div>
                   )}
                 </div>
@@ -817,6 +863,7 @@ function ResultPanel({
                 auctionId={auction._id}
                 isWinner={isMeWinner}
                 winningPrice={winnerBid.price}
+                endAt={auction.endAt}
               />
             </>
           )}
