@@ -2,14 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../config/api";
-import { UserData, Transaction } from "../types/account";
-import { mockTransactions } from "../data/mockData";
+import { UserData } from "../types/account";
 import AccountLayout from "../components/Account/AccountLayout";
 import ProfileTab from "../components/Account/ProfileTab";
 import ListingsTab from "../components/Account/ListingsTab";
 import ChatTab from "../components/Account/ChatTab";
 import FavoritesTab from "../components/Account/FavoritesTab";
 import TransactionsTab from "../components/Account/TransactionsTab";
+import AuctionsTab from "../components/Account/AuctionsTab";
+import AppointmentsTab from "../components/Account/AppointmentsTab";
 
 const AccountPage: React.FC = () => {
   const location = useLocation();
@@ -20,11 +21,6 @@ const AccountPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
-
-  // Debug log
-  console.log("AccountPage - isAuthenticated:", isAuthenticated);
-  console.log("AccountPage - user:", user);
-  console.log("AccountPage - user.role:", user?.role);
 
   // Fetch user data from API
   useEffect(() => {
@@ -99,10 +95,6 @@ const AccountPage: React.FC = () => {
     );
   }
 
-  const userTransactions: Transaction[] = mockTransactions.filter(
-    (t) => t.buyerId === (userData?._id || user?.id)
-  );
-
   const renderTabContent = () => {
     switch (activeTab) {
       case "profile":
@@ -111,6 +103,12 @@ const AccountPage: React.FC = () => {
       case "listings":
         return <ListingsTab />;
 
+      case "auctions":
+        return <AuctionsTab />;
+
+      case "appointments":
+        return <AppointmentsTab />;
+
       case "chat":
         return <ChatTab />;
 
@@ -118,7 +116,7 @@ const AccountPage: React.FC = () => {
         return <FavoritesTab />;
 
       case "transactions":
-        return <TransactionsTab transactions={userTransactions} />;
+        return <TransactionsTab />;
 
       default:
         return null;

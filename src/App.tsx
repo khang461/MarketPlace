@@ -10,10 +10,20 @@ import PostListingPage from "./pages/PostListingPage";
 import AccountPage from "./pages/AccountPage";
 import ChatDetailPage from "./pages/ChatDetailPage";
 import SupportPage from "./pages/SupportPage";
+import NotificationsPage from "./pages/NotificationsPage";
 import SignInPage from "./pages/SignInPage";
 import SignUpPage from "./pages/SignUpPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import EkycPage from "./pages/EkycPage";
+import ContractPage from "./pages/Contract/contract";
+import WalletPage from "./pages/WalletPage";
+import NotificationDepositPage from "./pages/NotificationDepositPage";
+import StaffDashboard from "./pages/Staff/StaffDashboard";
+import StaffAppointmentPage from "./pages/Staff/StaffAppointmentPage";
+import StaffUsersPage from "./pages/Staff/StaffUsersPage";
+import ProtectedRoute from "./components/Common/ProtectedRoute";
+import StaffRedirect from "./components/Common/StaffRedirect";
 import ScrollToTop from "./components/ScrollToTop/scrollToTop";
 import "./utils/websocketDebug"; // Load debug tools
 
@@ -22,7 +32,7 @@ import AuctionListPage from "./pages/Auction/AuctionListPage";
 import AuctionDetailPage from "./pages/Auction/AuctionDetailPage";
 import StaffAuctionManagementPage from "./pages/Staff/StaffAuctionManagementPage";
 import AuctionCreatePage from "./pages/Auction/AuctionCreatePage";
-import AppointmentDetailPage from "./pages/AppointmentDetailPage";
+import AppointmentDetailPage from "./pages/AppointmentDetailPage"; // nếu chưa có thì có thể xoá import này
 import TransactionDetailPage from "./pages/TransactionDetailPage";
 
 // 🔽 bọc App bằng SocketProvider để bật realtime
@@ -30,16 +40,6 @@ import { SocketProvider } from "./contexts/SocketContext";
 import MyMembershipPage from "./pages/MyMembershipPage";
 import UpgradeMembershipPage from "./pages/UpgradeMembershipPage";
 import PaymentResultPage from "./pages/PaymentResultPage";
-import DepositPaymentResultPage from "./pages/DepositPaymentResultPage";
-import ProtectedRoute from "./components/Common/ProtectedRoute";
-import StaffRedirect from "./components/Common/StaffRedirect";
-import EkycPage from "./pages/EkycPage";
-import WalletPage from "./pages/WalletPage";
-import NotificationDepositPage from "./pages/NotificationDepositPage";
-import NotificationsPage from "./pages/NotificationsPage";
-import ContractPage from "./pages/Contract/contract";
-import StaffDashboard from "./pages/Staff/StaffDashboard";
-import StaffAppointmentPage from "./pages/Staff/StaffAppointmentPage";
 
 function App() {
   return (
@@ -103,14 +103,6 @@ function App() {
                     <Route
                       path="/membership/payment-result"
                       element={<PaymentResultPage />}
-                    />
-                    <Route
-                      path="/payments"
-                      element={<PaymentResultPage />}
-                    />
-                    <Route
-                      path="/deposits"
-                      element={<DepositPaymentResultPage />}
                     />
                     <Route
                       path="/notifications-deposit"

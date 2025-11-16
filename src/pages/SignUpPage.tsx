@@ -22,6 +22,16 @@ const SignUpPage: React.FC = () => {
     phone: "",
     password: "",
     confirmPassword: "",
+    gender: "male",
+    dateOfBirth: "",
+    avatar: "",
+    address: {
+      fullAddress: "",
+      ward: "",
+      district: "",
+      city: "",
+      province: "",
+    },
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -31,11 +41,27 @@ const SignUpPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+
+    // Handle nested address fields
+    if (name.startsWith("address.")) {
+      const addressField = name.split(".")[1];
+      setFormData({
+        ...formData,
+        address: {
+          ...formData.address,
+          [addressField]: value,
+        },
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value,
+      });
+    }
   };
 
   const validateForm = () => {
@@ -138,12 +164,22 @@ const SignUpPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Call API đăng ký
+      // Call API đăng ký với format mới
       const response = await authAPI.signUp({
         fullName: formData.fullName,
         phone: formData.phone,
         email: formData.email,
         password: formData.password,
+        gender: formData.gender,
+        dateOfBirth: formData.dateOfBirth,
+        avatar: formData.avatar,
+        address: {
+          fullAddress: formData.address.fullAddress,
+          ward: formData.address.ward,
+          district: formData.address.district,
+          city: formData.address.city,
+          province: formData.address.province,
+        },
         termsAgreed: agreeToTerms,
       });
 
@@ -326,9 +362,162 @@ const SignUpPage: React.FC = () => {
                   value={formData.phone}
                   onChange={handleChange}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder="0912345678"
+                  placeholder="0987654321"
                 />
               </div>
+            </div>
+
+            {/* Gender */}
+            <div>
+              <label
+                htmlFor="gender"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Giới tính
+              </label>
+              <select
+                id="gender"
+                name="gender"
+                value={formData.gender}
+                onChange={handleChange}
+                className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              >
+                <option value="male">Nam</option>
+                <option value="female">Nữ</option>
+                <option value="other">Khác</option>
+              </select>
+            </div>
+
+            {/* Date of Birth */}
+            <div>
+              <label
+                htmlFor="dateOfBirth"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Ngày sinh
+              </label>
+              <input
+                id="dateOfBirth"
+                name="dateOfBirth"
+                type="date"
+                value={formData.dateOfBirth}
+                onChange={handleChange}
+                className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              />
+            </div>
+
+            {/* Address */}
+            <div>
+              <label
+                htmlFor="address.fullAddress"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Địa chỉ
+              </label>
+              <input
+                id="address.fullAddress"
+                name="address.fullAddress"
+                type="text"
+                value={formData.address.fullAddress}
+                onChange={handleChange}
+                className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="123 Đường ABC"
+              />
+            </div>
+
+            {/* Ward */}
+            <div>
+              <label
+                htmlFor="address.ward"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Phường/Xã
+              </label>
+              <input
+                id="address.ward"
+                name="address.ward"
+                type="text"
+                value={formData.address.ward}
+                onChange={handleChange}
+                className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="Phường 1"
+              />
+            </div>
+
+            {/* District */}
+            <div>
+              <label
+                htmlFor="address.district"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Quận/Huyện
+              </label>
+              <input
+                id="address.district"
+                name="address.district"
+                type="text"
+                value={formData.address.district}
+                onChange={handleChange}
+                className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="Quận 1"
+              />
+            </div>
+
+            {/* City */}
+            <div>
+              <label
+                htmlFor="address.city"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Thành phố
+              </label>
+              <input
+                id="address.city"
+                name="address.city"
+                type="text"
+                value={formData.address.city}
+                onChange={handleChange}
+                className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="TP.HCM"
+              />
+            </div>
+
+            {/* Province */}
+            <div>
+              <label
+                htmlFor="address.province"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Tỉnh/Thành
+              </label>
+              <input
+                id="address.province"
+                name="address.province"
+                type="text"
+                value={formData.address.province}
+                onChange={handleChange}
+                className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="Hồ Chí Minh"
+              />
+            </div>
+
+            {/* Avatar URL (optional) */}
+            <div>
+              <label
+                htmlFor="avatar"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Avatar URL (tùy chọn)
+              </label>
+              <input
+                id="avatar"
+                name="avatar"
+                type="url"
+                value={formData.avatar}
+                onChange={handleChange}
+                className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="https://example.com/avatar.jpg"
+              />
             </div>
 
             {/* Password */}

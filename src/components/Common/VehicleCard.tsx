@@ -41,6 +41,28 @@ const VehicleCard: React.FC<VehicleCardProps> = ({
             Nổi bật
           </div>
         )}
+
+        {/* Status Badge */}
+        {vehicle.status && vehicle.status !== "Published" && (
+          <div
+            className={`absolute top-3 ${
+              vehicle.isFeatured ? "left-20" : "left-3"
+            } px-2 py-1 rounded text-xs font-medium ${
+              vehicle.status === "Sold"
+                ? "bg-red-500 text-white"
+                : vehicle.status === "InTransaction"
+                ? "bg-orange-500 text-white"
+                : "bg-green-500 text-white"
+            }`}
+          >
+            {vehicle.status === "Sold"
+              ? "Đã bán"
+              : vehicle.status === "InTransaction"
+              ? "Đang giao dịch"
+              : vehicle.status}
+          </div>
+        )}
+
         {showFavorite && (
           <button
             onClick={(e) => {

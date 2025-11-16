@@ -8,10 +8,16 @@ import {
   MessageSquare,
   Plus,
   LogOut,
+  Wallet,
+  FileText,
+  Gavel,
+  Crown, // ✅ NEW
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../config/api";
+import NotificationBellSimple from "../Common/NotificationBellSimple";
+import { getWonAuctionsPendingAppointment } from "../../config/auctionAPI";
 
 interface SearchSuggestion {
   query: string;
@@ -40,6 +46,9 @@ const Header: React.FC = () => {
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [popularSearches, setPopularSearches] = useState<PopularSearch[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
+  const [pendingAppointmentsCount, setPendingAppointmentsCount] =
+    useState<number>(0);
   const searchRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -102,6 +111,48 @@ const Header: React.FC = () => {
     fetchPopularSearches();
   }, []);
 
+  // Fetch unread notifications count
+  useEffect(() => {
+    const fetchUnreadNotifications = async () => {
+      if (!isAuthenticated) return;
+
+      try {
+        const response = await api.get("/notifications/unread-count");
+        if (response.data.success) {
+          setUnreadNotifications(response.data.count || 0);
+        }
+      } catch (error) {
+        console.error("Error fetching unread notifications:", error);
+        // Mock data for demo
+      }
+    };
+
+    fetchUnreadNotifications();
+  }, [isAuthenticated]);
+
+  // Fetch pending appointments count
+  useEffect(() => {
+    const fetchPendingAppointments = async () => {
+      if (!isAuthenticated) return;
+
+      try {
+        const response = await getWonAuctionsPendingAppointment({
+          page: 1,
+          limit: 100,
+        });
+        // Chỉ đếm những phiên chưa có lịch hẹn
+        const pendingCount = (response.data || []).filter(
+          (auction) => !auction.hasAppointment || auction.appointment === null
+        ).length;
+        setPendingAppointmentsCount(pendingCount);
+      } catch (error) {
+        console.error("Error fetching pending appointments:", error);
+      }
+    };
+
+    fetchPendingAppointments();
+  }, [isAuthenticated]);
+
   // Fetch suggestions when user types
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -137,14 +188,20 @@ const Header: React.FC = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      // Lưu lịch sử tìm kiếm nếu user đã đăng nhập
+    const trimmedQuery = searchQuery.trim();
+
+    if (trimmedQuery) {
+      // Có từ khóa: lưu lịch sử và tìm kiếm với keyword
       if (isAuthenticated) {
-        saveSearchToHistory(searchQuery.trim());
+        saveSearchToHistory(trimmedQuery);
       }
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-      setShowSuggestions(false);
+      navigate(`/search?q=${encodeURIComponent(trimmedQuery)}`);
+    } else {
+      // Không có từ khóa: navigate về search page để hiển thị toàn bộ
+      navigate("/search");
     }
+
+    setShowSuggestions(false);
   };
 
   const handleSuggestionClick = (suggestion: SearchSuggestion) => {
@@ -352,6 +409,16 @@ const Header: React.FC = () => {
             >
               Tìm kiếm
             </Link>
+
+            {/* ✅ NEW: Đấu giá */}
+            <Link
+              to="/auctions"
+              className="text-gray-700 hover:text-blue-600 font-medium flex items-center space-x-2"
+            >
+              <Gavel className="w-4 h-4" />
+              <span>Đấu giá</span>
+            </Link>
+
             <Link
               to="/post-listing"
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
@@ -359,6 +426,9 @@ const Header: React.FC = () => {
               <Plus className="w-4 h-4" />
               <span>Đăng tin</span>
             </Link>
+
+            {/* Notification Bell - Simple version without dropdown */}
+            {isAuthenticated && user && <NotificationBellSimple />}
 
             {/* User Menu */}
             {isAuthenticated ? (
@@ -390,9 +460,43 @@ const Header: React.FC = () => {
                   </div>
                   <Link
                     to="/account"
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 relative"
                   >
-                    Tài khoản
+                    <div className="flex items-center space-x-2">
+                      <User className="w-4 h-4" />
+                      <span>Tài khoản</span>
+                      {pendingAppointmentsCount > 0 && (
+                        <span className="bg-yellow-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-2">
+                          {pendingAppointmentsCount}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                  <Link
+                    to="/wallet"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <Wallet className="w-4 h-4" />
+                    <span>Ví của tôi</span>
+                  </Link>
+                  <Link
+                    to="/membership"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <Crown className="w-4 h-4" />
+                    <span>Quản lý gói</span>
+                  </Link>
+                  <Link
+                    to="/notifications-deposit"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2 relative"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Yêu cầu đặt cọc</span>
+                    {unreadNotifications > 0 && (
+                      <span className="ml-auto bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                      </span>
+                    )}
                   </Link>
                   <button
                     onClick={() => {
@@ -456,6 +560,17 @@ const Header: React.FC = () => {
               >
                 Tìm kiếm
               </Link>
+
+              {/* ✅ NEW: Đấu giá */}
+              <Link
+                to="/auctions"
+                className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg flex items-center space-x-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <Gavel className="w-4 h-4" />
+                <span>Đấu giá</span>
+              </Link>
+
               <Link
                 to="/post-listing"
                 className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
@@ -476,10 +591,38 @@ const Header: React.FC = () => {
                   </div>
                   <Link
                     to="/account"
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg relative"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Tài khoản
+                    <div className="flex items-center justify-between">
+                      <span>Tài khoản</span>
+                      {pendingAppointmentsCount > 0 && (
+                        <span className="bg-yellow-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-2">
+                          {pendingAppointmentsCount}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                  <Link
+                    to="/wallet"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg flex items-center space-x-2"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Wallet className="w-4 h-4" />
+                    <span>Ví của tôi</span>
+                  </Link>
+                  <Link
+                    to="/notifications-deposit"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg flex items-center space-x-2 relative"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Yêu cầu đặt cọc</span>
+                    {unreadNotifications > 0 && (
+                      <span className="ml-auto bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                      </span>
+                    )}
                   </Link>
                   <Link
                     to="/support"

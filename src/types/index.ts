@@ -30,11 +30,12 @@ export interface Vehicle {
   sellerRating: number;
   location: string;
   postedDate: string;
-  category: 'car' | 'battery';
+  category: 'car' | 'battery' | 'xe-dien' | 'pin';
   batteryCapacity?: number;
   batteryCondition?: string;
+  batteryHealth?: number;
   isFeatured: boolean;
-  status: 'available' | 'sold' | 'pending';
+  status: 'Published' | 'InTransaction' | 'Sold' | 'Draft' | 'PendingReview' | 'available' | 'sold' | 'pending';
 }
 
 export interface Review {
@@ -67,3 +68,58 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+export interface ContractData {
+  contractNumber: string;
+  contractDate: string;
+  meetingLocation: string;
+  
+  // Thông tin người bán
+  seller: {
+    fullName: string;
+    dateOfBirth: string;
+    idNumber: string;
+    idIssueDate: string;
+    idIssuePlace: string;
+    permanentAddress: string;
+    spouseName?: string;
+    spouseDateOfBirth?: string;
+    spouseIdNumber?: string;
+    spouseIdIssueDate?: string;
+    spouseIdIssuePlace?: string;
+    spousePermanentAddress?: string;
+  };
+  
+  // Thông tin người mua
+  buyer: {
+    fullName: string;
+    dateOfBirth: string;
+    idNumber: string;
+    idIssueDate: string;
+    idIssuePlace: string;
+    permanentAddress: string;
+  };
+  
+  // Thông tin xe
+  vehicle: {
+    licensePlate: string;
+    brand: string;
+    engineCapacity: string;
+    vehicleType: string;
+    color: string;
+    engineNumber: string;
+    chassisNumber: string;
+    registrationNumber: string;
+    registrationDate: string;
+    registrationAuthority: string;
+    additionalFeatures?: string;
+  };
+  
+  // Thông tin tài chính
+  financial: {
+    totalAmount: number;
+    totalAmountText: string;
+    depositAmount: number;
+    remainingAmount: number;
+    paymentMethod: string;
+  };
+}

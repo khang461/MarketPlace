@@ -27,12 +27,17 @@ export interface UserData {
     createdAt?: string;
     updatedAt?: string;
   };
+  // eKYC fields
+  ekycStatus?: "verified" | "pending" | "rejected" | string;
+  ekycProvider?: string;
+  ekycResult?: unknown;
+  verifiedAt?: string;
   stats?: {
     soldCount?: number;
     buyCount?: number;
     cancelRate?: number;
-    responseTime?: number;
-    completionRate?: number;
+    responseTime?: number; // phút/giờ (tuỳ bạn hiển thị)
+    completionRate?: number; // 0..1 hoặc %
   };
 }
 
@@ -40,14 +45,24 @@ export interface UserData {
  * Listing Types (khớp backend)
  * ========================= */
 
-// Media từ Cloudinary (giữ tương thích chỗ FE đang dùng `url`, `kind`)
+// Kiểu khi BE populate sellerId (Listing.find(...).populate("sellerId", "fullName phone avatar"))
+export type SellerRef =
+  | string
+  | {
+      _id: string;
+      fullName?: string;
+      phone?: string;
+      avatar?: string;
+    };
+
+// Media từ Cloudinary (FE dùng trực tiếp `url` — đã là secure_url)
 export interface Media {
   url: string; // Cloudinary secure_url
   kind: "photo" | "doc";
-  publicId?: string; // Cloudinary public_id (để xoá/transform)
+  publicId: string; // Cloudinary public_id (để xoá/sắp xếp) - BẮT BUỘC
   width?: number;
   height?: number;
-  format?: string; // ví dụ: jpg, png, webp
+  format?: string; // jpg | png | webp ...
 }
 
 export interface Location {
@@ -72,7 +87,10 @@ export type ConditionType = "New" | "LikeNew" | "Used" | "Worn";
 /** Base chung cho cả Car/Battery */
 interface BaseListing {
   _id: string;
-  sellerId?: string; // có thể populate tuỳ API
+
+  // BE có lúc trả string id, có lúc populate object → dùng union
+  sellerId?: SellerRef;
+
   type: "Car" | "Battery";
 
   make?: string;
@@ -87,7 +105,9 @@ interface BaseListing {
   location?: Location;
 
   priceListed: number;
-  tradeMethod: TradeMethod;
+
+  // Trên BE có default "meet" nhưng có thể vắng trong vài response → để optional
+  tradeMethod?: TradeMethod;
 
   status?: ListingStatus;
   notes?: string;
@@ -111,8 +131,10 @@ export interface CarListing extends BaseListing {
   engineNumber?: string; // Số máy
   chassisNumber?: string; // Số khung
   otherFeatures?: string; // Đặc điểm khác
-  // Battery-only fields sẽ KHÔNG xuất hiện ở đây
-  batteryCapacityKWh?: never;
+
+  // BE có thể gửi trường này cho Car → cho phép
+  batteryCapacityKWh?: number;
+  // Không dùng cho Car
   chargeCycles?: never;
 }
 
@@ -121,6 +143,7 @@ export interface BatteryListing extends BaseListing {
   type: "Battery";
   batteryCapacityKWh?: number;
   chargeCycles?: number;
+
   // Car-only fields sẽ KHÔNG xuất hiện ở đây
   licensePlate?: never;
   engineDisplacementCc?: never;

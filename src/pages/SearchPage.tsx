@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Grid, List, SlidersHorizontal } from "lucide-react";
+import {
+  Grid,
+  List,
+  SlidersHorizontal,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import VehicleCard from "../components/Common/VehicleCard";
 import { Vehicle } from "../types";
 import api from "../config/api";
@@ -113,6 +119,7 @@ const SearchPage: React.FC = () => {
         const response = await api.get("/listings", { params });
 
         console.log("Listings response:", response.data);
+        console.log("Params used:", params);
 
         setPagination(
           response.data.pagination || {
@@ -135,14 +142,11 @@ const SearchPage: React.FC = () => {
             price: listing.priceListed,
             category: listing.type === "Car" ? "xe-dien" : "pin",
             mileage: listing.mileageKm,
-            batteryHealth: Math.max(80, 100 - listing.chargeCycles / 20),
+            batteryHealth: Math.max(80, 100 - (listing.chargeCycles || 0) / 20),
             location: `${listing.location.district}, ${listing.location.city}`,
-            images: listing.photos.map((p) => `http://localhost:8081${p.url}`),
+            images: listing.photos.map((p) => p.url),
             postedDate: listing.createdAt,
-            status:
-              listing.condition === "LikeNew"
-                ? "available"
-                : listing.status.toLowerCase(),
+            status: listing.status, // Giữ nguyên status từ API: Published, InTransaction, Sold
             sellerId: listing.sellerId._id,
             isFeatured: false,
           })
@@ -195,6 +199,113 @@ const SearchPage: React.FC = () => {
       sortBy: "newest",
     });
     setSearchParams({});
+  };
+
+  const handlePageChange = (page: number) => {
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set("page", page.toString());
+    setSearchParams(newSearchParams);
+
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const renderPagination = () => {
+    if (pagination.totalPages <= 1) return null;
+
+    const pages = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(
+      1,
+      pagination.currentPage - Math.floor(maxVisiblePages / 2)
+    );
+    const endPage = Math.min(
+      pagination.totalPages,
+      startPage + maxVisiblePages - 1
+    );
+
+    if (endPage - startPage < maxVisiblePages - 1) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
+    return (
+      <div className="flex justify-center items-center space-x-2 mt-8">
+        {/* Previous Button */}
+        <button
+          onClick={() => handlePageChange(pagination.currentPage - 1)}
+          disabled={!pagination.hasPrevPage}
+          className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
+            pagination.hasPrevPage
+              ? "bg-white border border-gray-300 hover:bg-gray-50 text-gray-700"
+              : "bg-gray-100 text-gray-400 cursor-not-allowed"
+          }`}
+        >
+          <ChevronLeft className="w-4 h-4" />
+          <span>Trước</span>
+        </button>
+
+        {/* First Page */}
+        {startPage > 1 && (
+          <>
+            <button
+              onClick={() => handlePageChange(1)}
+              className="px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-700"
+            >
+              1
+            </button>
+            {startPage > 2 && <span className="px-2 text-gray-500">...</span>}
+          </>
+        )}
+
+        {/* Page Numbers */}
+        {pages.map((page) => (
+          <button
+            key={page}
+            onClick={() => handlePageChange(page)}
+            className={`px-4 py-2 rounded-lg ${
+              page === pagination.currentPage
+                ? "bg-blue-600 text-white"
+                : "bg-white border border-gray-300 hover:bg-gray-50 text-gray-700"
+            }`}
+          >
+            {page}
+          </button>
+        ))}
+
+        {/* Last Page */}
+        {endPage < pagination.totalPages && (
+          <>
+            {endPage < pagination.totalPages - 1 && (
+              <span className="px-2 text-gray-500">...</span>
+            )}
+            <button
+              onClick={() => handlePageChange(pagination.totalPages)}
+              className="px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-700"
+            >
+              {pagination.totalPages}
+            </button>
+          </>
+        )}
+
+        {/* Next Button */}
+        <button
+          onClick={() => handlePageChange(pagination.currentPage + 1)}
+          disabled={!pagination.hasNextPage}
+          className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
+            pagination.hasNextPage
+              ? "bg-white border border-gray-300 hover:bg-gray-50 text-gray-700"
+              : "bg-gray-100 text-gray-400 cursor-not-allowed"
+          }`}
+        >
+          <span>Sau</span>
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    );
   };
 
   return (
@@ -492,6 +603,11 @@ const SearchPage: React.FC = () => {
               <>
                 <div className="mb-4 text-sm text-gray-600">
                   Tìm thấy <strong>{pagination.totalCount}</strong> kết quả
+                  {pagination.totalPages > 1 && (
+                    <span className="ml-2">
+                      (Trang {pagination.currentPage} / {pagination.totalPages})
+                    </span>
+                  )}
                 </div>
                 <div
                   className={
@@ -504,6 +620,9 @@ const SearchPage: React.FC = () => {
                     <VehicleCard key={vehicle.id} vehicle={vehicle} />
                   ))}
                 </div>
+
+                {/* Pagination */}
+                {renderPagination()}
               </>
             )}
           </div>

@@ -1,5 +1,12 @@
 import React from "react";
-import { User, Heart, Clock, Package, MessageCircle } from "lucide-react";
+import {
+  User,
+  Heart,
+  Package,
+  Gavel,
+  CalendarCheck,
+  Wallet,
+} from "lucide-react";
 
 interface Tab {
   id: string;
@@ -16,9 +23,11 @@ interface AccountLayoutProps {
 const tabs: Tab[] = [
   { id: "profile", name: "Hồ sơ", icon: User },
   { id: "listings", name: "Tin đăng", icon: Package },
-  { id: "chat", name: "Tin nhắn", icon: MessageCircle },
+  { id: "auctions", name: "Đấu giá", icon: Gavel },
+  { id: "appointments", name: "Lịch hẹn", icon: CalendarCheck },
+  // { id: "chat", name: "Tin nhắn", icon: MessageCircle },
   { id: "favorites", name: "Yêu thích", icon: Heart },
-  { id: "transactions", name: "Giao dịch", icon: Clock },
+  { id: "transactions", name: "Giao dịch", icon: Wallet },
 ];
 
 const AccountLayout: React.FC<AccountLayoutProps> = ({
