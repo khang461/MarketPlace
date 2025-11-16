@@ -15,6 +15,8 @@ import api from "../config/api";
 import { getImageUrl } from "../utils/imageHelper";
 import { useAuth } from "../contexts/AuthContext";
 import Swal from "sweetalert2";
+import QRPaymentModal from "../components/QRPaymentModal";
+import { generateFullPaymentQR } from "../config/depositPaymentAPI";
 
 interface ListingDetail {
   _id: string;
@@ -629,6 +631,20 @@ const VehicleDetailPage: React.FC = () => {
                     ? "Đang giao dịch"
                     : "Đặt cọc"}
                 </button>
+                {listing.status === "Published" &&
+                  user?.id !== listing.sellerId._id && (
+                    <button
+                      onClick={handleFullPayment}
+                      disabled={isDepositing}
+                      className={`w-full py-3 rounded-lg font-semibold transition-colors ${
+                        isDepositing
+                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          : "bg-green-600 text-white hover:bg-green-700"
+                      }`}
+                    >
+                      Mua ngay (Thanh toán toàn bộ)
+                    </button>
+                  )}
                 <button className="w-full border border-blue-600 text-blue-600 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2">
                   <Heart className="w-4 h-4" />
                   <span>Thêm vào yêu thích</span>
@@ -770,6 +786,23 @@ const VehicleDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* QR Payment Modal */}
+      {qrData && (
+        <QRPaymentModal
+          isOpen={qrModalOpen}
+          onClose={() => {
+            setQrModalOpen(false);
+            setQrData(null);
+          }}
+          qrCode={qrData.qrCode}
+          paymentUrl={qrData.paymentUrl}
+          amount={qrData.amount}
+          title={qrData.title}
+          description={qrData.description}
+          orderId={qrData.orderId}
+        />
+      )}
     </div>
   );
 };
