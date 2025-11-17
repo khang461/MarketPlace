@@ -2,7 +2,7 @@
 // src/pages/Auction/AuctionDetailPage.tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getAuctionById } from "../../config/auctionAPI";
+import { getAuctionById, checkDepositStatus } from "../../config/auctionAPI";
 import type { Auction, Bid } from "../../types/auction";
 import {
   AuctionCountdown,
@@ -121,6 +121,15 @@ export default function AuctionDetailPage() {
   // NEW: modal xác nhận thay cho window.confirm
   const [showConfirm, setShowConfirm] = useState(false);
 
+  // Đã có cọc trên BE chưa
+  const [hasDeposit, setHasDeposit] = useState<boolean | null>(null);
+
+  // Chỉ auto-click DepositButton ngay sau khi user bấm OK trong modal
+  const [autoClickDeposit, setAutoClickDeposit] = useState(false);
+
+  // NEW: thời gian hiện tại để auto cập nhật trạng thái / quyền đặt giá
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
   const { isConnected, on, off, joinAuction, leaveAuction } = useSocket();
 
   const load = useCallback(async () => {
@@ -181,6 +190,36 @@ export default function AuctionDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Timer cập nhật thời gian mỗi 1s để UI tự chuyển PENDING -> RUNNING -> ENDED
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Hàm reload trạng thái đặt cọc
+  const refreshDepositStatus = useCallback(async () => {
+    if (!auctionId || !me) return;
+    try {
+      const res = await checkDepositStatus(auctionId);
+      if (res.success && res.hasDeposit && res.deposit?.status === "FROZEN") {
+        setHasDeposit(true);
+        setConfirmedDeposit(true); // để hiển thị khối DepositButton
+      } else {
+        setHasDeposit(false);
+      }
+    } catch (e) {
+      console.error("checkDepositStatus error:", e);
+      setHasDeposit(false);
+    }
+  }, [auctionId, me]);
+
+  // Gọi 1 lần khi vào trang
+  useEffect(() => {
+    refreshDepositStatus();
+  }, [refreshDepositStatus]);
 
   // Realtime đăng ký/unregister
   useEffect(() => {
@@ -264,7 +303,6 @@ export default function AuctionDetailPage() {
       (auction as any).displayStatus ?? auction.status ?? ""
     ).toLowerCase();
 
-    const now = Date.now();
     const start = new Date(auction.startAt).getTime();
     const end = new Date(auction.endAt).getTime();
 
@@ -273,7 +311,7 @@ export default function AuctionDetailPage() {
 
     // Ưu tiên ended / hết giờ
     if (raw === "ended" || raw === "closed") return "ENDED";
-    if (now >= end) return "ENDED";
+    if (nowMs >= end) return "ENDED";
 
     // Đang diễn ra theo status
     if (raw === "active" || raw === "running" || raw === "ongoing") {
@@ -281,20 +319,20 @@ export default function AuctionDetailPage() {
     }
 
     // Đang diễn ra theo thời gian (status vẫn là 'approved')
-    if (now >= start && now < end) {
+    if (nowMs >= start && nowMs < end) {
       return "RUNNING";
     }
 
     // Còn lại: chưa đến giờ
     return "PENDING";
-  }, [auction]);
+  }, [auction, nowMs]);
 
   const isSeller = useMemo(
     () => !!me && !!sellerId && String(me) === String(sellerId),
     [me, sellerId]
   );
 
-  const now = Date.now();
+  const now = nowMs;
   const inWindow =
     !!auction &&
     new Date(auction.startAt).getTime() <= now &&
@@ -408,23 +446,25 @@ export default function AuctionDetailPage() {
 
   const depositWrapRef = useRef<HTMLDivElement | null>(null);
 
-  // Nếu người dùng đã xác nhận, thử auto-click nút bên trong DepositButton (nếu trình duyệt cho phép)
+  // Nếu người dùng đã xác nhận + vừa bấm OK modal, thử auto-click nút bên trong DepositButton
   useEffect(() => {
-    if (!confirmedDeposit) return;
+    if (!confirmedDeposit || !autoClickDeposit) return;
     const id = requestAnimationFrame(() => {
       const btn = depositWrapRef.current?.querySelector<HTMLButtonElement>(
         "button, [role='button']"
       );
       btn?.click?.(); // auto click 1 lần; nếu bị chặn, người dùng bấm thủ công
+      setAutoClickDeposit(false);
     });
     return () => cancelAnimationFrame(id);
-  }, [confirmedDeposit]);
+  }, [confirmedDeposit, autoClickDeposit]);
 
   // NEW: mở/đóng modal xác nhận
   const handleOpenConfirm = () => setShowConfirm(true);
   const handleConfirmDeposit = () => {
     setShowConfirm(false);
     setConfirmedDeposit(true);
+    setAutoClickDeposit(true); // chỉ auto-click ngay sau khi user confirm
   };
 
   /** =================== Render =================== */
@@ -720,19 +760,33 @@ export default function AuctionDetailPage() {
                 </div>
               </div>
 
-              {/* Nút mở modal xác nhận */}
-              <button
-                type="button"
-                onClick={handleOpenConfirm}
-                disabled={isEnded}
-                className="w-full px-4 py-2.5 rounded-lg bg-indigo-600 text-white font-medium shadow-sm hover:bg-indigo-700 disabled:opacity-50 active:scale-[.99] transition"
-              >
-                Đặt cọc để tham gia
-              </button>
+              {/* Nút mở modal xác nhận / trạng thái đã cọc */}
+              {hasDeposit === true ? (
+                <div className="mt-1 text-xs text-emerald-600">
+                  Bạn đã đặt cọc cho phiên đấu giá này.
+                </div>
+              ) : hasDeposit === false ? (
+                <button
+                  type="button"
+                  onClick={handleOpenConfirm}
+                  disabled={isEnded}
+                  className="w-full mt-2 px-4 py-2.5 rounded-lg bg-indigo-600 text-white font-medium shadow-sm hover:bg-indigo-700 disabled:opacity-50 active:scale-[.99] transition"
+                >
+                  Đặt cọc để tham gia
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full mt-2 px-4 py-2.5 rounded-lg bg-gray-200 text-gray-500 font-medium cursor-wait"
+                >
+                  Đang kiểm tra trạng thái đặt cọc...
+                </button>
+              )}
 
-              {/* Sau khi user đồng ý: hiển thị DepositButton gốc (auto-click một lần nếu có thể) */}
-              {confirmedDeposit && (
-                <div className="rounded-lg border p-3">
+              {/* Sau khi user đồng ý hoặc đã có cọc: hiển thị DepositButton gốc */}
+              {(confirmedDeposit || hasDeposit) && (
+                <div className="rounded-lg border p-3 mt-2">
                   <div className="text-sm mb-2">
                     Đang xử lý đặt cọc {fmtVND(depositAmount)}…
                     <span className="text-gray-500">
@@ -747,7 +801,7 @@ export default function AuctionDetailPage() {
                       isSeller={isSeller}
                       onChanged={() => {
                         setDepVersion((v) => v + 1); // kích BidBox re-check cọc
-                        // Không reset confirmedDeposit để người dùng có thể thấy lại nút nếu cần thanh toán lại
+                        refreshDepositStatus(); // reload trạng thái cọc từ BE
                       }}
                     />
                   </div>
@@ -907,6 +961,12 @@ function ConfirmDepositModal({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  const [acceptedRules, setAcceptedRules] = useState(false);
+
+  useEffect(() => {
+    if (open) setAcceptedRules(false);
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -929,8 +989,41 @@ function ConfirmDepositModal({
             <h3 className="text-lg font-semibold">Xác nhận đặt cọc</h3>
             <p className="mt-2 text-sm text-gray-600">
               Bạn sẽ đặt cọc <b>{fmtVND(amount)}</b> để tham gia phiên đấu giá
-              này. Bạn có chắc muốn tiếp tục không?
+              này.
             </p>
+            <ul className="mt-2 text-xs text-gray-600 list-disc list-inside space-y-1">
+              <li>
+                Nếu bạn <b>thắng đấu giá nhưng không tạo lịch hẹn trong 24h</b>,
+                hệ thống sẽ xử lý:
+              </li>
+              <li className="ml-4">
+                Khấu trừ <b>50% tiền cọc</b> (30% chuyển cho người bán, 20% cho
+                hệ thống), 50% còn lại được hoàn về ví của bạn.
+              </li>
+              <li className="ml-4">
+                Tài khoản của bạn có thể bị <b>tạm khóa trong 3 ngày</b>.
+              </li>
+            </ul>
+            <p className="mt-2 text-xs text-gray-600">
+              Vui lòng đọc kỹ điều khoản trước khi tiếp tục.
+            </p>
+            <div className="mt-3 flex items-start gap-2">
+              <input
+                id="deposit-rules"
+                type="checkbox"
+                checked={acceptedRules}
+                onChange={(e) => setAcceptedRules(e.target.checked)}
+                className="mt-[2px] h-4 w-4 rounded border-gray-300"
+              />
+              <label
+                htmlFor="deposit-rules"
+                className="text-xs text-gray-700"
+              >
+                Tôi đã đọc và đồng ý với điều khoản đặt cọc &amp; quy tắc xử lý
+                vi phạm (bao gồm việc khấu trừ tiền cọc và tạm khóa tài khoản
+                trong trường hợp vi phạm).
+              </label>
+            </div>
           </div>
           <div className="px-5 pb-5 flex items-center justify-end gap-2">
             <button
@@ -942,7 +1035,8 @@ function ConfirmDepositModal({
             </button>
             <button
               onClick={onConfirm}
-              className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+              disabled={!acceptedRules}
+              className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
               type="button"
             >
               OK

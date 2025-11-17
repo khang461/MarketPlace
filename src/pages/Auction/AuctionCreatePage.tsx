@@ -79,13 +79,13 @@ export default function AuctionCreatePage() {
     [myListings, form.listingId]
   );
 
-  // Tính giá tối thiểu: 80% của priceListed (nếu có)
+  // Tính giá tối thiểu: 10% của priceListed (nếu có)
   const minStartingPrice = useMemo(() => {
     const base = selectedListing?.priceListed;
     if (typeof base === "number" && !Number.isNaN(base)) {
-      return Math.ceil(base * 0.8);
+      return Math.ceil(base * 0.1);
     }
-    return 0; // nếu không có priceListed thì không áp ngưỡng 80%
+    return 0; // nếu không có priceListed thì không áp ngưỡng 10%
   }, [selectedListing]);
 
   // Label cho dropdown
@@ -149,7 +149,7 @@ export default function AuctionCreatePage() {
       form.startingPrice < minStartingPrice
     ) {
       setMsg(
-        `Giá khởi điểm phải ≥ 80% giá trị xe (${fmtVND(minStartingPrice)}).`
+        `Giá khởi điểm phải ≥ 10% giá trị xe (${fmtVND(minStartingPrice)}).`
       );
       return;
     }
@@ -192,7 +192,7 @@ export default function AuctionCreatePage() {
         <h1 className="text-2xl font-semibold">Tạo phiên đấu giá</h1>
         <p className="text-sm text-gray-500 mt-1">
           Chọn xe đã được duyệt và thiết lập thời gian &amp; giá khởi điểm. Giá
-          khởi điểm phải <span className="font-medium">≥ 80% giá trị xe</span>.
+          khởi điểm phải <span className="font-medium">≥ 10% giá trị xe</span>.
         </p>
       </div>
 
@@ -311,7 +311,7 @@ export default function AuctionCreatePage() {
                 <span className="text-gray-600">
                   Tối thiểu:{" "}
                   <span className="font-medium">
-                    {fmtVND(minStartingPrice)} (80% của{" "}
+                    {fmtVND(minStartingPrice)} (10% của{" "}
                     {fmtVND(selectedListing.priceListed)})
                   </span>
                 </span>
