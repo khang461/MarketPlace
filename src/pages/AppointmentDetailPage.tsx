@@ -386,7 +386,18 @@ export default function AppointmentDetailPage() {
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h3 className="font-semibold text-lg mb-4">Hành động</h3>
               <div className="flex flex-wrap gap-3">
-                {/* Chỉ cho phép seller xác nhận, buyer tự động xác nhận khi tạo lịch hẹn */}
+                {/* Buyer and Seller can independently confirm if they haven't yet */}
+                {canConfirm && isBuyer && !appointment.buyerConfirmed && (
+                  <button
+                    onClick={handleConfirm}
+                    disabled={actionLoading}
+                    className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    Xác nhận tham gia
+                  </button>
+                )}
+
                 {canConfirm && isSeller && !appointment.sellerConfirmed && (
                   <button
                     onClick={handleConfirm}
