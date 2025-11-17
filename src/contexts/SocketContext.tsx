@@ -78,6 +78,10 @@ interface SocketContextType {
   onContactStatusUpdate: (cb: AnyCb) => void;
   onNewOffer: (cb: AnyCb) => void;
   onNewAppointment: (cb: AnyCb) => void;
+  onMessageEdited: (cb: AnyCb) => void;
+  onMessageDeleted: (cb: AnyCb) => void;
+  onMessageReactionUpdated: (cb: AnyCb) => void;
+  onFileUploaded: (cb: AnyCb) => void;
 
   // ========== AUCTION METHODS ==========
   joinAuction: (auctionId: string) => void;
@@ -92,6 +96,8 @@ interface SocketContextType {
   onAuctionRejected: (cb: AnyCb) => void;
   onAuctionCancelled: (cb: AnyCb) => void;
   onNewBid: (cb: AnyCb) => void;
+  onAuctionEnded: (cb: AnyCb) => void;
+  onAuctionBidPlaced: (cb: AnyCb) => void;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -242,6 +248,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
   const onContactStatusUpdate = (cb: AnyCb) => on("contact_status_update", cb);
   const onNewOffer = (cb: AnyCb) => on("new_offer", cb);
   const onNewAppointment = (cb: AnyCb) => on("new_appointment", cb);
+  const onMessageEdited = (cb: AnyCb) => on("message_edited", cb);
+  const onMessageDeleted = (cb: AnyCb) => on("message_deleted", cb);
+  const onMessageReactionUpdated = (cb: AnyCb) =>
+    on("message_reaction_updated", cb);
+  const onFileUploaded = (cb: AnyCb) => on("file_uploaded", cb);
 
   // ================== AUCTION METHODS ==================
   const joinAuction = (auctionId: string) => {
@@ -270,6 +281,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
   const onAuctionRejected = (cb: AnyCb) => on("auction_rejected", cb);
   const onAuctionCancelled = (cb: AnyCb) => on("auction_cancelled", cb);
   const onNewBid = (cb: AnyCb) => on("new_bid", cb);
+  const onAuctionEnded = (cb: AnyCb) => on("auction:ended", cb);
+  const onAuctionBidPlaced = (cb: AnyCb) => on("auction:bidPlaced", cb);
 
   return (
     <SocketContext.Provider
@@ -300,6 +313,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
         onContactStatusUpdate,
         onNewOffer,
         onNewAppointment,
+        onMessageEdited,
+        onMessageDeleted,
+        onMessageReactionUpdated,
+        onFileUploaded,
 
         // Auction methods
         joinAuction,
@@ -312,6 +329,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
         onAuctionRejected,
         onAuctionCancelled,
         onNewBid,
+        onAuctionEnded,
+        onAuctionBidPlaced,
       }}
     >
       {children}
