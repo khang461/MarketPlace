@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
@@ -13,15 +13,17 @@ import {
   MoreVertical,
   Edit2,
   Trash2,
+  Calendar,
 } from "lucide-react";
 import api from "../config/api";
-import { Chat, Message } from "../types/chat";
+import { Chat, Message, ChatListing } from "../types/chat";
 import { getImageUrl } from "../utils/imageHelper";
 import Swal from "sweetalert2";
 import { useAuth } from "../contexts/AuthContext";
 import { useSocket } from "../contexts/SocketContext";
 import NotificationManager from "../utils/notificationManager";
 import ChatSidebar from "../components/Chat/ChatSidebar";
+import AppointmentModal from "../components/Chat/AppointmentModal";
 
 const ChatDetailPage: React.FC = () => {
   const { chatId } = useParams<{ chatId: string }>();
@@ -60,10 +62,43 @@ const ChatDetailPage: React.FC = () => {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
+  const [activeAppointment, setActiveAppointment] = useState<{
+    _id?: string;
+    scheduledDate: string;
+    status: string;
+    location?: string;
+    notes?: string;
+  } | null>(null);
+  const [isCheckingAppointment, setIsCheckingAppointment] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch active appointment function
+  const fetchActiveAppointment = useCallback(async () => {
+    if (!chatId || !user) return;
+
+    try {
+      setIsCheckingAppointment(true);
+      const response = await api.get(`/appointments/chat/${chatId}`);
+
+      if (response.data.success) {
+        if (response.data.hasActiveAppointment && response.data.data) {
+          setActiveAppointment(response.data.data);
+        } else {
+          setActiveAppointment(null);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching active appointment:", error);
+      // Nếu lỗi, vẫn cho phép hiển thị nút (fail-safe)
+      setActiveAppointment(null);
+    } finally {
+      setIsCheckingAppointment(false);
+    }
+  }, [chatId, user]);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -77,6 +112,7 @@ const ChatDetailPage: React.FC = () => {
         await fetchMessages();
         await markMessagesAsRead();
         await fetchOnlineUsers();
+        await fetchActiveAppointment();
       }
     };
     loadChatData();
@@ -165,10 +201,20 @@ const ChatDetailPage: React.FC = () => {
       }
     };
 
+    // Listen for appointment created from chat
+    const handleAppointmentCreated = (data: { chatId: string }) => {
+      if (data.chatId === chatId) {
+        console.log("📅 Appointment created from chat:", data);
+        // Refresh appointment khi có appointment mới được tạo
+        fetchActiveAppointment();
+      }
+    };
+
     onNewMessage(handleNewMessage);
     onUserTyping(handleUserTyping);
     onUserStoppedTyping(handleUserStoppedTyping);
     onContactStatusUpdate(handleContactStatusUpdate);
+    socket.on("appointment_created_from_chat", handleAppointmentCreated);
 
     // Cleanup
     return () => {
@@ -177,9 +223,10 @@ const ChatDetailPage: React.FC = () => {
       socket.off("user_typing", handleUserTyping);
       socket.off("user_stopped_typing", handleUserStoppedTyping);
       socket.off("contact_status_update", handleContactStatusUpdate);
+      socket.off("appointment_created_from_chat", handleAppointmentCreated);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, chatId, user?.id]);
+  }, [socket, chatId, user?.id, fetchActiveAppointment]);
 
   useEffect(() => {
     scrollToBottom();
@@ -875,6 +922,28 @@ const ChatDetailPage: React.FC = () => {
   const isOtherUserOnline =
     otherUser?._id && onlineUsers.includes(otherUser._id);
 
+  // Kiểm tra điều kiện hiển thị nút "Đặt lịch xem xe"
+  // User phải là buyer hoặc seller của chat này
+  // Chat phải có listingId
+  // Không có appointment active
+  const isBuyerOrSeller =
+    user?.id &&
+    (chat.buyerId?._id === user.id || chat.sellerId?._id === user.id);
+  const hasListing = !!listing;
+  const canCreateAppointment =
+    isBuyerOrSeller &&
+    hasListing &&
+    !activeAppointment &&
+    !isCheckingAppointment;
+
+  // Lấy địa chỉ từ listing nếu có (có thể từ location, address, hoặc các field khác)
+  // Note: ChatListing type không có location field, nhưng API có thể trả về thêm fields
+  const listingLocation = listing && 'location' in listing 
+    ? (listing as ChatListing & { location?: string }).location 
+    : listing && 'address' in listing
+    ? (listing as ChatListing & { address?: string }).address
+    : undefined;
+
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar - Fixed width */}
@@ -935,31 +1004,87 @@ const ChatDetailPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Listing Info - Compact */}
-              {listing && (
-                <Link
-                  to={`/vehicle/${listing._id}`}
-                  className="hidden md:flex items-center space-x-2 bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors group"
-                >
-                  {listing.photos?.[0] && (
-                    <img
-                      src={getImageUrl(listing.photos[0])}
-                      alt="Listing"
-                      className="w-10 h-10 rounded object-cover ring-1 ring-gray-200"
-                    />
-                  )}
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
-                      {listing.make} {listing.model} {listing.year}
-                    </p>
-                    {listing.priceListed && (
-                      <p className="text-xs text-gray-600 font-semibold">
-                        {listing.priceListed.toLocaleString("vi-VN")} đ
+              {/* Right side: Listing Info + Appointment Button */}
+              <div className="flex items-center gap-3">
+                {/* Listing Info - Compact */}
+                {listing && (
+                  <Link
+                    to={`/vehicle/${listing._id}`}
+                    className="hidden md:flex items-center space-x-2 bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors group"
+                  >
+                    {listing.photos?.[0] && (
+                      <img
+                        src={getImageUrl(listing.photos[0])}
+                        alt="Listing"
+                        className="w-10 h-10 rounded object-cover ring-1 ring-gray-200"
+                      />
+                    )}
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
+                        {listing.make} {listing.model} {listing.year}
                       </p>
+                      {listing.priceListed && (
+                        <p className="text-xs text-gray-600 font-semibold">
+                          {listing.priceListed.toLocaleString("vi-VN")} đ
+                        </p>
+                      )}
+                    </div>
+                  </Link>
+                )}
+
+                {/* Appointment Card or Button */}
+                {activeAppointment ? (
+                  <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 max-w-xs">
+                    <Calendar className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                    <div className="text-left min-w-0 flex-1">
+                      <p className="text-xs font-medium text-blue-900 truncate">
+                        Đã có lịch hẹn:{" "}
+                        {new Date(activeAppointment.scheduledDate).toLocaleString(
+                          "vi-VN",
+                          {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }
+                        )}
+                      </p>
+                      <p className="text-xs text-blue-600 truncate">
+                        {activeAppointment.status === "PENDING"
+                          ? "Chờ xác nhận"
+                          : activeAppointment.status === "CONFIRMED"
+                          ? "Đã xác nhận"
+                          : activeAppointment.status === "COMPLETED"
+                          ? "Đã hoàn thành"
+                          : activeAppointment.status === "RESCHEDULED"
+                          ? "Đã dời lịch"
+                          : activeAppointment.status === "CANCELLED"
+                          ? "Đã hủy"
+                          : activeAppointment.status}
+                      </p>
+                    </div>
+                    {activeAppointment._id && (
+                      <Link
+                        to={`/appointments/${activeAppointment._id}`}
+                        className="text-xs text-blue-600 hover:underline flex-shrink-0 ml-1"
+                        title="Xem chi tiết"
+                      >
+                        →
+                      </Link>
                     )}
                   </div>
-                </Link>
-              )}
+                ) : canCreateAppointment ? (
+                  <button
+                    onClick={() => setIsAppointmentModalOpen(true)}
+                    className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg font-medium text-sm"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span className="hidden sm:inline">Đặt lịch xem xe</span>
+                    <span className="sm:hidden">Đặt lịch</span>
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
@@ -1318,6 +1443,16 @@ const ChatDetailPage: React.FC = () => {
             Xóa tin nhắn
           </button>
         </div>
+      )}
+
+      {/* Appointment Modal */}
+      {chatId && (
+        <AppointmentModal
+          isOpen={isAppointmentModalOpen}
+          onClose={() => setIsAppointmentModalOpen(false)}
+          chatId={chatId}
+          listingLocation={listingLocation}
+        />
       )}
     </div>
   );
