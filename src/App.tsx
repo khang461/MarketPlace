@@ -30,6 +30,7 @@ import "./utils/websocketDebug"; // Load debug tools
 // 🔽 thêm 3 import cho phần đấu giá
 import AuctionListPage from "./pages/Auction/AuctionListPage";
 import AuctionDetailPage from "./pages/Auction/AuctionDetailPage";
+import StaffAuctionManagementPage from "./pages/Staff/StaffAuctionManagementPage";
 import AuctionCreatePage from "./pages/Auction/AuctionCreatePage";
 import AppointmentDetailPage from "./pages/AppointmentDetailPage"; // nếu chưa có thì có thể xoá import này
 import TransactionDetailPage from "./pages/TransactionDetailPage";
@@ -39,6 +40,7 @@ import { SocketProvider } from "./contexts/SocketContext";
 import MyMembershipPage from "./pages/MyMembershipPage";
 import UpgradeMembershipPage from "./pages/UpgradeMembershipPage";
 import PaymentResultPage from "./pages/PaymentResultPage";
+import DepositPaymentResultPage from "./pages/DepositPaymentResultPage";
 
 function App() {
   return (
@@ -67,10 +69,10 @@ function App() {
             }
           />
           <Route
-            path="/staff/users"
+            path="/staff/auction-management"
             element={
               <ProtectedRoute requiredRole="staff">
-                <StaffUsersPage  />
+                <StaffAuctionManagementPage />
               </ProtectedRoute>
             }
           />
@@ -102,6 +104,14 @@ function App() {
                     <Route
                       path="/membership/payment-result"
                       element={<PaymentResultPage />}
+                    />
+                    <Route
+                      path="/payments"
+                      element={<PaymentResultPage />}
+                    />
+                    <Route
+                      path="/deposits"
+                      element={<DepositPaymentResultPage />}
                     />
                     <Route
                       path="/notifications-deposit"

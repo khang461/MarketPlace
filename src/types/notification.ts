@@ -1,7 +1,16 @@
 export interface Notification {
   _id: string;
   userId: string;
-  type: "message" | "offer" | "appointment" | "listing" | "system";
+  type:
+    | "message"
+    | "offer"
+    | "appointment"
+    | "listing"
+    | "system"
+    | "auction_approved"
+    | "auction_rejected"
+    | "new_auction"
+    | "auction_cancelled";
   title: string;
   message: string;
   relatedId?: string;
@@ -28,6 +37,11 @@ export interface Notification {
     offerAmount?: number;
     appointmentDate?: Date;
     listingTitle?: string;
+    auctionId?: string;
+    minParticipants?: number;
+    maxParticipants?: number;
+    reason?: string;
+    vehicleTitle?: string;
     [key: string]: string | number | Date | undefined;
   };
   readAt?: Date;

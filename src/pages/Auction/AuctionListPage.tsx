@@ -11,11 +11,13 @@ import type { Auction } from "../../types/auction";
 import { AuctionCard } from "../../components/Auction";
 import { useSearchParams, Link } from "react-router-dom";
 
-type TabKey = "RUNNING" | "PENDING" | "ENDED";
+type TabKey = "RUNNING" | "PENDING" | "ENDED" | "CANCELLED";
 
 function normalizeStatus(s?: string): TabKey {
   const k = (s ?? "").toUpperCase();
-  return k === "PENDING" || k === "ENDED" ? (k as TabKey) : "RUNNING";
+  return k === "PENDING" || k === "ENDED" || k === "CANCELLED"
+    ? (k as TabKey)
+    : "RUNNING";
 }
 
 /** Tìm mảng auction bên trong payload theo nhiều shape khác nhau */
@@ -40,10 +42,15 @@ function pickItems(payload: any): Auction[] {
   return [];
 }
 
-const statusMap: Record<TabKey, "ongoing" | "upcoming" | "ended"> = {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const statusMap: Record<
+  TabKey,
+  "ongoing" | "upcoming" | "ended" | "cancelled"
+> = {
   RUNNING: "ongoing",
   PENDING: "upcoming",
   ENDED: "ended",
+  CANCELLED: "cancelled",
 };
 
 const SHOW_DEBUG = false; // bật true nếu muốn xem nguồn API & sample
@@ -51,7 +58,10 @@ const SHOW_DEBUG = false; // bật true nếu muốn xem nguồn API & sample
 export default function AuctionListPage() {
   const [items, setItems] = useState<Auction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [debug, setDebug] = useState<{ source: string; rawSample?: any } | null>(null);
+  const [debug, setDebug] = useState<{
+    source: string;
+    rawSample?: any;
+  } | null>(null);
   const [params, setParams] = useSearchParams();
 
   const status = normalizeStatus(params.get("status") ?? "RUNNING");
@@ -66,12 +76,13 @@ export default function AuctionListPage() {
         let respAll: any | undefined;
         let arr: Auction[] = [];
 
-        // 1) endpoint hợp nhất nếu có
+        // 1) endpoint hợp nhất: lấy TẤT CẢ, để FE tự lọc theo thời gian & status
         try {
           const { data } = await getAllAuctions({
             page: 1,
             limit: 50,
-            status: statusMap[status],
+            // KHÔNG truyền status ở đây nữa, tránh BE lọc sai tab
+            // status: statusMap[status],
           });
           respAll = data;
           arr = pickItems(respAll);
@@ -80,7 +91,9 @@ export default function AuctionListPage() {
             if (SHOW_DEBUG) {
               setDebug({
                 source: "GET /auctions/all",
-                rawSample: Array.isArray(respAll) ? respAll[0] : respAll?.items?.[0] ?? respAll?.data?.[0],
+                rawSample: Array.isArray(respAll)
+                  ? respAll[0]
+                  : respAll?.items?.[0] ?? respAll?.data?.[0],
               });
             }
             return;
@@ -89,12 +102,18 @@ export default function AuctionListPage() {
           // fallback
         }
 
-        // 2) fallback theo từng tab
+        // 2) fallback theo từng tab (chỉ dùng khi API /all lỗi thật sự)
         let respEach: any;
         if (status === "RUNNING") {
-          ({ data: respEach } = await getOngoingAuctions({ page: 1, limit: 50 }));
+          ({ data: respEach } = await getOngoingAuctions({
+            page: 1,
+            limit: 50,
+          }));
         } else if (status === "PENDING") {
-          ({ data: respEach } = await getUpcomingAuctions({ page: 1, limit: 50 }));
+          ({ data: respEach } = await getUpcomingAuctions({
+            page: 1,
+            limit: 50,
+          }));
         } else {
           ({ data: respEach } = await getEndedAuctions({ page: 1, limit: 50 }));
         }
@@ -111,7 +130,9 @@ export default function AuctionListPage() {
                   : status === "PENDING"
                   ? "GET /auctions/upcoming"
                   : "GET /auctions/ended",
-              rawSample: Array.isArray(respEach) ? respEach[0] : respEach?.items?.[0] ?? respEach?.data?.[0],
+              rawSample: Array.isArray(respEach)
+                ? respEach[0]
+                : respEach?.items?.[0] ?? respEach?.data?.[0],
             });
           }
         }
@@ -131,19 +152,58 @@ export default function AuctionListPage() {
     };
   }, [status]);
 
-  // Lọc theo ô tìm kiếm (BE đã lọc theo tab)
+  // Lọc theo ô tìm kiếm (BE đã trả về all, FE tự lọc theo tab + text)
   const filtered = useMemo(() => {
+    const now = Date.now();
+    let result = items;
+
+    // Lọc theo thời gian thực tế để đảm bảo hiển thị đúng tab
+    result = items.filter((a) => {
+      const startTime = new Date(a.startAt).getTime();
+      const endTime = new Date(a.endAt).getTime();
+
+      // Tab "Đã hủy" - chỉ hiển thị phiên cancelled
+      if (status === "CANCELLED") {
+        return a.status === "cancelled";
+      }
+
+      // Loại bỏ phiên cancelled khỏi các tab khác
+      if (a.status === "cancelled") {
+        return false;
+      }
+
+      // Tab "Đang diễn ra" - chỉ hiển thị phiên đang trong thời gian
+      if (status === "RUNNING") {
+        return now >= startTime && now < endTime;
+      }
+
+      // Tab "Sắp diễn ra" - chỉ hiển thị phiên chưa bắt đầu
+      if (status === "PENDING") {
+        return now < startTime;
+      }
+
+      // Tab "Đã kết thúc" - chỉ hiển thị phiên đã qua thời gian kết thúc
+      if (status === "ENDED") {
+        return now >= endTime;
+      }
+
+      return true;
+    });
+
     const term = qParam.toLowerCase();
-    if (!term) return items;
-    return items.filter((a) => {
+    if (!term) return result;
+
+    return result.filter((a) => {
       const listing: any = (a as any).listing;
       const primaryTitle =
         listing?.title ??
-        [listing?.make, listing?.model, listing?.year].filter(Boolean).join(" ");
+        [listing?.make, listing?.model, listing?.year]
+          .filter(Boolean)
+          .join(" ");
       const title = primaryTitle ? primaryTitle : a.listingId;
       return String(title).toLowerCase().includes(term);
     });
-  }, [items, qParam]);
+  }, [items, qParam, status]);
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-8">
@@ -151,7 +211,9 @@ export default function AuctionListPage() {
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Phiên đấu giá</h1>
-          <p className="text-sm text-gray-500">Xem các phiên đang diễn ra, sắp diễn ra và đã kết thúc.</p>
+          <p className="text-sm text-gray-500">
+            Xem các phiên đang diễn ra, sắp diễn ra và đã kết thúc.
+          </p>
         </div>
         <Link
           to="/auctions/create"
@@ -164,18 +226,23 @@ export default function AuctionListPage() {
       {/* Tabs + Search */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="inline-flex rounded-lg border bg-white p-1">
-          {([
-            { k: "RUNNING", label: "Đang diễn ra" },
-            { k: "PENDING", label: "Sắp diễn ra" },
-            { k: "ENDED", label: "Đã kết thúc" },
-          ] as { k: TabKey; label: string }[]).map((t) => {
+          {(
+            [
+              { k: "RUNNING", label: "Đang diễn ra" },
+              { k: "PENDING", label: "Sắp diễn ra" },
+              { k: "ENDED", label: "Đã kết thúc" },
+              { k: "CANCELLED", label: "Đã hủy" },
+            ] as { k: TabKey; label: string }[]
+          ).map((t) => {
             const active = status === t.k;
             return (
               <button
                 key={t.k}
                 aria-current={active ? "page" : undefined}
                 className={`px-3 py-1.5 text-sm rounded-md transition ${
-                  active ? "bg-indigo-600 text-white shadow" : "text-gray-700 hover:bg-gray-50"
+                  active
+                    ? "bg-indigo-600 text-white shadow"
+                    : "text-gray-700 hover:bg-gray-50"
                 }`}
                 onClick={() =>
                   setParams((p) => {
@@ -265,7 +332,12 @@ function EmptyState() {
   return (
     <div className="rounded-2xl border bg-white p-10 text-center text-gray-600">
       <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-gray-100">
-        <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+        <svg
+          className="h-6 w-6"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden
+        >
           <path d="M10 2a8 8 0 105.293 14.293l4.707 4.707 1.414-1.414-4.707-4.707A8 8 0 0010 2zm0 2a6 6 0 110 12A6 6 0 0110 4z" />
         </svg>
       </div>

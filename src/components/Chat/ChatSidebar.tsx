@@ -13,7 +13,7 @@ const ChatSidebar: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
   const { chatId } = useParams<{ chatId: string }>();
-  const { socket } = useSocket();
+  const { socket, onNewMessage } = useSocket();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -62,12 +62,12 @@ const ChatSidebar: React.FC = () => {
       });
     };
 
-    socket.on("new_message", handleNewMessage);
+    onNewMessage(handleNewMessage);
 
     return () => {
       socket.off("new_message", handleNewMessage);
     };
-  }, [socket, chatId, user?.id]);
+  }, [socket, chatId, user?.id, onNewMessage]);
 
   const fetchChats = async () => {
     try {

@@ -379,8 +379,13 @@ const AppointmentManagement: React.FC = () => {
 
   const fetchContractPhotos = async (appointmentId: string) => {
     try {
+      console.log("🔵 Fetching contract for appointmentId:", appointmentId);
       const response = await api.get(`/contracts/${appointmentId}`);
       console.log("Contract API response:", response.data);
+      console.log(
+        "Full response structure:",
+        JSON.stringify(response.data, null, 2)
+      );
 
       // Kiểm tra nhiều cấu trúc response có thể có
       const contract =
@@ -395,39 +400,62 @@ const AppointmentManagement: React.FC = () => {
 
         // **CHỈ CẬP NHẬT THÔNG TIN TỪ CONTRACT NẾU THIẾU, GIỮ NGUYÊN DỮ LIỆU BAN ĐẦU**
         if (contract.vehicle || contract.transaction) {
+          console.log("🔍 Contract transaction data:", contract.transaction);
+          console.log(
+            "🔍 Contract depositAmount:",
+            contract.transaction?.depositAmount
+          );
+
           setSelectedAppointment((prev) => {
             if (!prev) return prev;
 
-            // Chỉ tính toán nếu thiếu dữ liệu từ appointment ban đầu
-            const depositAmount = 
-              prev.transaction?.depositAmount || 
-              contract.transaction?.depositAmount || 
+            console.log("🔍 Prev transaction data:", prev.transaction);
+            console.log(
+              "🔍 Prev depositAmount:",
+              prev.transaction?.depositAmount
+            );
+
+            // Ưu tiên dữ liệu từ contract API vì nó chính xác nhất
+            const depositAmount =
+              contract.transaction?.depositAmount ||
+              prev.transaction?.depositAmount ||
               0;
-            const vehiclePrice = 
-              prev.transaction?.vehiclePrice || 
-              prev.vehicle?.price || 
-              contract.transaction?.finalPrice || 
+            const vehiclePrice =
+              contract.transaction?.finalPrice ||
+              prev.transaction?.vehiclePrice ||
+              prev.vehicle?.price ||
               0;
-            const remainingAmount = 
-              prev.transaction?.remainingAmount || 
-              (vehiclePrice - depositAmount);
+            const remainingAmount =
+              contract.transaction?.remainingAmount ||
+              prev.transaction?.remainingAmount ||
+              vehiclePrice - depositAmount;
             const depositPercentage =
+              contract.transaction?.depositPercentage ||
               prev.transaction?.depositPercentage ||
               (vehiclePrice > 0
                 ? `${((depositAmount / vehiclePrice) * 100).toFixed(2)}`
                 : "0.00");
+
+            console.log("💰 Calculated depositAmount:", depositAmount);
+            console.log("💰 Calculated vehiclePrice:", vehiclePrice);
+            console.log("💰 Calculated remainingAmount:", remainingAmount);
 
             // Map vehicle data: Ưu tiên dữ liệu từ appointment, chỉ bổ sung từ contract nếu thiếu
             const vehicleInfo = prev.vehicle
               ? {
                   ...prev.vehicle,
                   // Chỉ cập nhật các trường mà appointment không có
-                  title: prev.vehicle.title || contract.vehicle?.model || undefined,
-                  brand: prev.vehicle.brand || contract.vehicle?.brand || undefined,
+                  title:
+                    prev.vehicle.title || contract.vehicle?.model || undefined,
+                  brand:
+                    prev.vehicle.brand || contract.vehicle?.brand || undefined,
                   // Giữ nguyên make từ appointment (quan trọng!)
-                  make: prev.vehicle.make || contract.vehicle?.make || undefined,
-                  model: prev.vehicle.model || contract.vehicle?.model || undefined,
-                  year: prev.vehicle.year || contract.vehicle?.year || undefined,
+                  make:
+                    prev.vehicle.make || contract.vehicle?.make || undefined,
+                  model:
+                    prev.vehicle.model || contract.vehicle?.model || undefined,
+                  year:
+                    prev.vehicle.year || contract.vehicle?.year || undefined,
                   price: prev.vehicle.price || vehiclePrice || 0,
                 }
               : contract.vehicle
@@ -442,17 +470,17 @@ const AppointmentManagement: React.FC = () => {
                 }
               : prev.vehicle;
 
-            // Map transaction data: Ưu tiên dữ liệu từ appointment, chỉ bổ sung từ contract nếu thiếu
+            // Map transaction data: Ưu tiên dữ liệu MỚI từ contract API
             const transactionInfo = prev.transaction
               ? {
                   ...prev.transaction,
-                  // Chỉ cập nhật nếu thiếu
-                  depositAmount: prev.transaction.depositAmount || depositAmount,
-                  // GIỮ NGUYÊN depositStatus từ appointment (quan trọng!)
+                  // Ưu tiên giá trị đã tính toán từ contract API (chính xác hơn)
+                  depositAmount: depositAmount, // Luôn dùng giá trị từ contract
+                  vehiclePrice: vehiclePrice, // Luôn dùng giá trị từ contract
+                  remainingAmount: remainingAmount, // Luôn dùng giá trị từ contract
+                  depositPercentage: depositPercentage, // Luôn dùng giá trị từ contract
+                  // Chỉ giữ depositStatus từ prev nếu có, vì contract không trả về field này
                   depositStatus: prev.transaction.depositStatus || "IN_ESCROW",
-                  vehiclePrice: prev.transaction.vehiclePrice || vehiclePrice,
-                  remainingAmount: prev.transaction.remainingAmount || remainingAmount,
-                  depositPercentage: prev.transaction.depositPercentage || depositPercentage,
                 }
               : contract.transaction
               ? {
@@ -470,7 +498,9 @@ const AppointmentManagement: React.FC = () => {
               transaction: transactionInfo,
             };
           });
-          console.log("✅ Updated vehicle and transaction from contract API (preserving original data)");
+          console.log(
+            "✅ Updated vehicle and transaction from contract API (preserving original data)"
+          );
         }
 
         // Kiểm tra xem có photos ở đâu không

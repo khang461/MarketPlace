@@ -29,7 +29,23 @@ export default function AuctionCard({ a }: { a: Auction }) {
     typeof a.currentPrice === "number" ? a.currentPrice : getHighestBid(a);
 
   // Map status API -> UI cho Countdown + badge LIVE
-  const uiStatus = mapAuctionStatus(a.status);
+  // Nhưng cần check thời gian thực tế để override nếu cần
+  let uiStatus = mapAuctionStatus(a.status);
+
+  // Override status dựa trên thời gian thực tế
+  const now = Date.now();
+  const startTime = new Date(a.startAt).getTime();
+  const endTime = new Date(a.endAt).getTime();
+
+  if (a.status === "cancelled") {
+    uiStatus = "CANCELLED";
+  } else if (now >= endTime) {
+    uiStatus = "ENDED";
+  } else if (now >= startTime && now < endTime) {
+    uiStatus = "RUNNING";
+  } else if (now < startTime) {
+    uiStatus = "PENDING";
+  }
 
   // Prepare listing image: use getImageUrl helper for consistent URL handling
   const listingImageRaw =
@@ -58,11 +74,16 @@ export default function AuctionCard({ a }: { a: Auction }) {
           />
         ) : null}
 
-        {/* LIVE badge */}
+        {/* Status badges */}
         {uiStatus === "RUNNING" && (
           <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-red-600/90 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-white shadow">
             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
             LIVE
+          </span>
+        )}
+        {uiStatus === "CANCELLED" && (
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-red-600/90 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-white shadow">
+            ĐÃ HỦY
           </span>
         )}
       </div>

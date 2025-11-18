@@ -15,6 +15,8 @@ import api from "../config/api";
 import { getImageUrl } from "../utils/imageHelper";
 import { useAuth } from "../contexts/AuthContext";
 import Swal from "sweetalert2";
+import QRPaymentModal from "../components/QRPaymentModal";
+import { generateFullPaymentQR } from "../config/depositPaymentAPI";
 
 interface ListingDetail {
   _id: string;
@@ -58,6 +60,15 @@ const VehicleDetailPage: React.FC = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isDepositing, setIsDepositing] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrData, setQrData] = useState<{
+    qrCode: string;
+    paymentUrl: string;
+    amount: number;
+    title: string;
+    description: string;
+    orderId?: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchListingDetail = async () => {
@@ -376,6 +387,94 @@ const VehicleDetailPage: React.FC = () => {
     }
   };
 
+  const handleFullPayment = async () => {
+    if (isDepositing) return;
+
+    if (!isAuthenticated) {
+      Swal.fire({
+        icon: "warning",
+        title: "Cần đăng nhập",
+        text: "Vui lòng đăng nhập để mua xe",
+        confirmButtonColor: "#2563eb",
+        showCancelButton: true,
+        confirmButtonText: "Đăng nhập",
+        cancelButtonText: "Hủy",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          navigate("/signin");
+        }
+      });
+      return;
+    }
+
+    if (!id) return;
+
+    const result = await Swal.fire({
+      icon: "question",
+      title: "Xác nhận mua xe",
+      html: `
+        <p class="text-left mb-4">Bạn có chắc chắn muốn mua xe này với giá <strong>${formatPrice(
+          listing.priceListed
+        )}</strong>?</p>
+        <p class="text-left text-sm text-gray-600">Sau khi xác nhận, bạn sẽ được chuyển đến trang thanh toán QR code.</p>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "Xác nhận",
+      cancelButtonText: "Hủy",
+      confirmButtonColor: "#16a34a",
+    });
+
+    if (!result.isConfirmed) return;
+
+    setIsDepositing(true);
+
+    try {
+      const response = await generateFullPaymentQR({
+        listingId: id,
+      });
+
+      if (response.success && response.qrCode) {
+        setQrData({
+          qrCode: response.qrCode,
+          paymentUrl: response.paymentUrl,
+          amount: response.fullAmount,
+          title: "Thanh toán toàn bộ",
+          description: `Thanh toán ${formatPrice(
+            response.fullAmount
+          )} cho giao dịch mua xe`,
+          orderId: response.orderId,
+        });
+        setQrModalOpen(true);
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Lỗi",
+          text: response.message || "Không thể tạo QR code thanh toán",
+          confirmButtonColor: "#2563eb",
+        });
+      }
+    } catch (error: unknown) {
+      console.error("Error generating full payment QR:", error);
+      const axiosError = error as {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      };
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi",
+        text:
+          axiosError.response?.data?.message ||
+          "Không thể tạo QR code thanh toán",
+        confirmButtonColor: "#2563eb",
+      });
+    } finally {
+      setIsDepositing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -629,6 +728,20 @@ const VehicleDetailPage: React.FC = () => {
                     ? "Đang giao dịch"
                     : "Đặt cọc"}
                 </button>
+                {listing.status === "Published" &&
+                  user?.id !== listing.sellerId._id && (
+                    <button
+                      onClick={handleFullPayment}
+                      disabled={isDepositing}
+                      className={`w-full py-3 rounded-lg font-semibold transition-colors ${
+                        isDepositing
+                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          : "bg-green-600 text-white hover:bg-green-700"
+                      }`}
+                    >
+                      Mua ngay (Thanh toán toàn bộ)
+                    </button>
+                  )}
                 <button className="w-full border border-blue-600 text-blue-600 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2">
                   <Heart className="w-4 h-4" />
                   <span>Thêm vào yêu thích</span>
@@ -770,6 +883,23 @@ const VehicleDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* QR Payment Modal */}
+      {qrData && (
+        <QRPaymentModal
+          isOpen={qrModalOpen}
+          onClose={() => {
+            setQrModalOpen(false);
+            setQrData(null);
+          }}
+          qrCode={qrData.qrCode}
+          paymentUrl={qrData.paymentUrl}
+          amount={qrData.amount}
+          title={qrData.title}
+          description={qrData.description}
+          orderId={qrData.orderId}
+        />
+      )}
     </div>
   );
 };

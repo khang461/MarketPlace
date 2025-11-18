@@ -2,7 +2,7 @@
 // src/pages/Auction/AuctionDetailPage.tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getAuctionById } from "../../config/auctionAPI";
+import { getAuctionById, checkDepositStatus } from "../../config/auctionAPI";
 import type { Auction, Bid } from "../../types/auction";
 import {
   AuctionCountdown,
@@ -18,13 +18,7 @@ import api from "../../config/api";
 import { getImageUrl } from "../../utils/imageHelper";
 
 /** =================== Utils =================== */
-type UIStatus = "PENDING" | "RUNNING" | "ENDED";
-const mapStatus = (s: any): UIStatus => {
-  const k = String(s ?? "").toLowerCase();
-  if (k === "active" || k === "running") return "RUNNING";
-  if (k === "ended" || k === "closed") return "ENDED";
-  return "PENDING";
-};
+type UIStatus = "PENDING" | "RUNNING" | "ENDED" | "CANCELLED";
 
 function topBid(a: Auction | null): Bid | null {
   if (!a?.bids?.length) return null;
@@ -58,17 +52,24 @@ const fmtVND = (n?: number) =>
     ? n.toLocaleString("vi-VN") + "₫"
     : "0₫";
 
-const StatusBadge = ({ status }: { status: UIStatus | "ENDED" }) => {
+const StatusBadge = ({
+  status,
+}: {
+  status: UIStatus | "ENDED" | "CANCELLED";
+}) => {
   const map: Record<string, string> = {
     PENDING: "bg-amber-100 text-amber-700 border border-amber-200",
     RUNNING: "bg-emerald-100 text-emerald-700 border border-emerald-200",
     ENDED: "bg-gray-200 text-gray-700 border border-gray-300",
+    CANCELLED: "bg-red-100 text-red-700 border border-red-200",
   };
   const label =
     status === "RUNNING"
       ? "Đang diễn ra"
       : status === "ENDED"
       ? "Đã kết thúc"
+      : status === "CANCELLED"
+      ? "Đã hủy"
       : "Sắp diễn ra";
   return (
     <span
@@ -78,6 +79,26 @@ const StatusBadge = ({ status }: { status: UIStatus | "ENDED" }) => {
     </span>
   );
 };
+
+/** Lấy userId dạng string từ 1 bid để so sánh */
+function extractBidUserId(b: Bid | any): string | null {
+  if (!b) return null;
+  // userId có thể là string hoặc object
+  if (typeof b.userId === "string") return b.userId;
+  if (b.userId && typeof b.userId === "object") {
+    const u = b.userId as any;
+    return (
+      u._id?.toString() || u.id?.toString() || u.userId?.toString() || null
+    );
+  }
+  if (b.user && typeof b.user === "object") {
+    const u = b.user as any;
+    return (
+      u._id?.toString() || u.id?.toString() || u.userId?.toString() || null
+    );
+  }
+  return null;
+}
 
 export default function AuctionDetailPage() {
   const { auctionId = "" } = useParams();
@@ -99,6 +120,15 @@ export default function AuctionDetailPage() {
 
   // NEW: modal xác nhận thay cho window.confirm
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // Đã có cọc trên BE chưa
+  const [hasDeposit, setHasDeposit] = useState<boolean | null>(null);
+
+  // Chỉ auto-click DepositButton ngay sau khi user bấm OK trong modal
+  const [autoClickDeposit, setAutoClickDeposit] = useState(false);
+
+  // NEW: thời gian hiện tại để auto cập nhật trạng thái / quyền đặt giá
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const { isConnected, on, off, joinAuction, leaveAuction } = useSocket();
 
@@ -161,35 +191,148 @@ export default function AuctionDetailPage() {
     load();
   }, [load]);
 
+  // Timer cập nhật thời gian mỗi 1s để UI tự chuyển PENDING -> RUNNING -> ENDED
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Hàm reload trạng thái đặt cọc
+  const refreshDepositStatus = useCallback(async () => {
+    if (!auctionId || !me) return;
+    try {
+      const res = await checkDepositStatus(auctionId);
+      if (res.success && res.hasDeposit && res.deposit?.status === "FROZEN") {
+        setHasDeposit(true);
+        setConfirmedDeposit(true); // để hiển thị khối DepositButton
+      } else {
+        setHasDeposit(false);
+      }
+    } catch (e) {
+      console.error("checkDepositStatus error:", e);
+      setHasDeposit(false);
+    }
+  }, [auctionId, me]);
+
+  // Gọi 1 lần khi vào trang
+  useEffect(() => {
+    refreshDepositStatus();
+  }, [refreshDepositStatus]);
+
   // Realtime đăng ký/unregister
   useEffect(() => {
     if (!auctionId || !isConnected) return;
     joinAuction?.(auctionId);
 
-    const refresh = () => load();
+    // Handler for instant bid updates - update state directly without API call
+    const handleBidUpdate = (data: any) => {
+      console.log("🔥 Instant bid update:", data);
 
-    on?.("auction_bid_update", refresh);
-    on?.("auction_closed", refresh);
-    on?.("auction:bidPlaced", refresh);
-    on?.("auction:ended", refresh);
+      // Update auction state immediately from WebSocket data
+      setAuction((prev) => {
+        if (!prev) return prev;
+
+        const newBid = data.bid || data.newBid;
+        if (!newBid) return prev;
+
+        // Add new bid to the list
+        const updatedBids = [...(prev.bids || []), newBid];
+
+        // Update current price
+        const newCurrentPrice = Math.max(
+          newBid.price,
+          prev.currentPrice || prev.startingPrice || 0
+        );
+
+        return {
+          ...prev,
+          bids: updatedBids,
+          currentPrice: newCurrentPrice,
+          // Update other fields if provided
+          ...(data.auction && {
+            status: data.auction.status || prev.status,
+            winnerId: data.auction.winnerId || prev.winnerId,
+          }),
+        };
+      });
+    };
+
+    // Handler for auction ended event
+    const handleAuctionEnded = (data: any) => {
+      console.log("🏁 Auction ended:", data);
+      setAuction((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          status: "ended",
+          winnerId: data.winnerId || data.auction?.winnerId || prev.winnerId,
+        };
+      });
+    };
+
+    // Handler for auction closed
+    const handleAuctionClosed = () => {
+      console.log("🔒 Auction closed");
+      load(); // Full reload for closed auctions
+    };
+
+    // Listen to all bid-related events
+    on?.("auction_bid_update", handleBidUpdate);
+    on?.("auction:bidPlaced", handleBidUpdate);
+    on?.("new_bid", handleBidUpdate);
+    on?.("auction:ended", handleAuctionEnded);
+    on?.("auction_closed", handleAuctionClosed);
 
     return () => {
       leaveAuction?.(auctionId);
-      off?.("auction_bid_update", refresh);
-      off?.("auction_closed", refresh);
-      off?.("auction:bidPlaced", refresh);
-      off?.("auction:ended", refresh);
+      off?.("auction_bid_update", handleBidUpdate);
+      off?.("auction:bidPlaced", handleBidUpdate);
+      off?.("new_bid", handleBidUpdate);
+      off?.("auction:ended", handleAuctionEnded);
+      off?.("auction_closed", handleAuctionClosed);
     };
   }, [auctionId, isConnected, on, off, joinAuction, leaveAuction, load]);
 
-  // ===== Derivations =====
-  const uiStatus: UIStatus = mapStatus(auction?.status);
+  // ===== Tính trạng thái UI dựa trên status + thời gian =====
+  const uiStatus: UIStatus = useMemo(() => {
+    if (!auction) return "PENDING";
+
+    const raw = String(
+      (auction as any).displayStatus ?? auction.status ?? ""
+    ).toLowerCase();
+
+    const start = new Date(auction.startAt).getTime();
+    const end = new Date(auction.endAt).getTime();
+
+    // Ưu tiên cancelled
+    if (raw === "cancelled") return "CANCELLED";
+
+    // Ưu tiên ended / hết giờ
+    if (raw === "ended" || raw === "closed") return "ENDED";
+    if (nowMs >= end) return "ENDED";
+
+    // Đang diễn ra theo status
+    if (raw === "active" || raw === "running" || raw === "ongoing") {
+      return "RUNNING";
+    }
+
+    // Đang diễn ra theo thời gian (status vẫn là 'approved')
+    if (nowMs >= start && nowMs < end) {
+      return "RUNNING";
+    }
+
+    // Còn lại: chưa đến giờ
+    return "PENDING";
+  }, [auction, nowMs]);
+
   const isSeller = useMemo(
     () => !!me && !!sellerId && String(me) === String(sellerId),
     [me, sellerId]
   );
 
-  const now = Date.now();
+  const now = nowMs;
   const inWindow =
     !!auction &&
     new Date(auction.startAt).getTime() <= now &&
@@ -199,7 +342,11 @@ export default function AuctionDetailPage() {
     uiStatus === "ENDED" ||
     (!!auction && now >= new Date(auction.endAt).getTime());
 
-  const canBid = !isEnded && inWindow && uiStatus === "RUNNING" && !isSeller;
+  const isCancelled =
+    uiStatus === "CANCELLED" || auction?.status === "cancelled";
+
+  const canBid =
+    !isEnded && !isCancelled && inWindow && uiStatus === "RUNNING" && !isSeller;
 
   const currentPrice = useMemo(() => {
     if (!auction) return 0;
@@ -251,10 +398,7 @@ export default function AuctionDetailPage() {
   // Kiểm tra winner - userId có thể là string hoặc object
   const isMeWinner = useMemo(() => {
     if (!winnerBid || !me) return false;
-    const winnerUserId =
-      typeof (winnerBid as any).userId === "string"
-        ? (winnerBid as any).userId
-        : (winnerBid as any).userId?._id || (winnerBid as any).userId?.id;
+    const winnerUserId = extractBidUserId(winnerBid);
     return !!winnerUserId && String(winnerUserId) === String(me);
   }, [winnerBid, me]);
 
@@ -269,6 +413,19 @@ export default function AuctionDetailPage() {
         : prev
     );
   };
+
+  /** ====== xử lý lịch sử đấu giá top 10 giá cao nhất ====== */
+  const topBids = useMemo(() => {
+    if (!auction?.bids?.length) return [];
+    // sắp xếp theo giá cao → thấp, lấy 10 người đầu
+    const byPrice = [...auction.bids].sort((a, b) => b.price - a.price);
+    return byPrice.slice(0, 10);
+  }, [auction]);
+
+  const currentTopUserId = useMemo(() => {
+    if (!topBids.length) return null;
+    return extractBidUserId(topBids[0]);
+  }, [topBids]);
 
   /** ====== Deposit amount & confirmation flow ====== */
   const depositAmount = useMemo(() => {
@@ -289,23 +446,25 @@ export default function AuctionDetailPage() {
 
   const depositWrapRef = useRef<HTMLDivElement | null>(null);
 
-  // Nếu người dùng đã xác nhận, thử auto-click nút bên trong DepositButton (nếu trình duyệt cho phép)
+  // Nếu người dùng đã xác nhận + vừa bấm OK modal, thử auto-click nút bên trong DepositButton
   useEffect(() => {
-    if (!confirmedDeposit) return;
+    if (!confirmedDeposit || !autoClickDeposit) return;
     const id = requestAnimationFrame(() => {
       const btn = depositWrapRef.current?.querySelector<HTMLButtonElement>(
         "button, [role='button']"
       );
       btn?.click?.(); // auto click 1 lần; nếu bị chặn, người dùng bấm thủ công
+      setAutoClickDeposit(false);
     });
     return () => cancelAnimationFrame(id);
-  }, [confirmedDeposit]);
+  }, [confirmedDeposit, autoClickDeposit]);
 
   // NEW: mở/đóng modal xác nhận
   const handleOpenConfirm = () => setShowConfirm(true);
   const handleConfirmDeposit = () => {
     setShowConfirm(false);
     setConfirmedDeposit(true);
+    setAutoClickDeposit(true); // chỉ auto-click ngay sau khi user confirm
   };
 
   /** =================== Render =================== */
@@ -395,11 +554,17 @@ export default function AuctionDetailPage() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/0" />
             <div className="absolute bottom-3 left-3 right-3">
               <div className="flex items-center gap-2">
-                <StatusBadge status={isEnded ? "ENDED" : uiStatus} />
+                <StatusBadge
+                  status={
+                    isCancelled ? "CANCELLED" : isEnded ? "ENDED" : uiStatus
+                  }
+                />
                 <AuctionCountdown
                   startAt={auction.startAt}
                   endAt={auction.endAt}
-                  status={isEnded ? "ENDED" : uiStatus}
+                  status={
+                    isCancelled ? "CANCELLED" : isEnded ? "ENDED" : uiStatus
+                  }
                 />
               </div>
               <h1 className="mt-2 text-white text-xl md:text-2xl font-semibold drop-shadow">
@@ -461,7 +626,11 @@ export default function AuctionDetailPage() {
         <div className="rounded-2xl border bg-white shadow-sm p-4">
           <h3 className="font-semibold mb-3">Lịch sử đấu giá</h3>
           {auction.bids?.length ? (
-            <AuctionHistory bids={auction.bids ?? []} />
+            <AuctionHistory
+              bids={topBids as any}
+              topUserId={currentTopUserId || undefined}
+              meId={me}
+            />
           ) : (
             <div className="rounded-lg border border-dashed p-6 text-center text-gray-500">
               Chưa có lượt đấu giá nào.
@@ -490,13 +659,17 @@ export default function AuctionDetailPage() {
             <div className="text-sm text-gray-600">
               Trạng thái:
               <span className="ml-2">
-                <StatusBadge status={isEnded ? "ENDED" : uiStatus} />
+                <StatusBadge
+                  status={
+                    isCancelled ? "CANCELLED" : isEnded ? "ENDED" : uiStatus
+                  }
+                />
               </span>
             </div>
             <AuctionCountdown
               startAt={auction.startAt}
               endAt={auction.endAt}
-              status={isEnded ? "ENDED" : uiStatus}
+              status={isCancelled ? "CANCELLED" : isEnded ? "ENDED" : uiStatus}
             />
           </div>
           <div className="grid grid-cols-2 gap-3 pt-1">
@@ -515,8 +688,39 @@ export default function AuctionDetailPage() {
           </div>
         </div>
 
+        {/* Cancellation Reason */}
+        {isCancelled && auction.cancellationReason && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 shadow-sm p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-red-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-red-900 mb-1">
+                  Lý do hủy phiên đấu giá
+                </h3>
+                <p className="text-sm text-red-800">
+                  {auction.cancellationReason}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Result panel on desktop */}
-        {isEnded && (
+        {isEnded && !isCancelled && (
           <div className="hidden lg:block rounded-2xl border bg-white shadow-sm p-4 space-y-3">
             <ResultPanel
               auction={auction}
@@ -529,7 +733,16 @@ export default function AuctionDetailPage() {
 
         {/* Actions */}
         <div className="rounded-2xl border bg-white shadow-sm p-4 space-y-3">
-          {!sellerIdLoaded ? (
+          {isCancelled ? (
+            <div className="p-4 text-center">
+              <p className="text-red-600 font-medium">
+                Phiên đấu giá đã bị hủy
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                Không thể thực hiện thao tác
+              </p>
+            </div>
+          ) : !sellerIdLoaded ? (
             <div className="p-3 text-center text-gray-500">
               Đang kiểm tra quyền...
             </div>
@@ -547,19 +760,33 @@ export default function AuctionDetailPage() {
                 </div>
               </div>
 
-              {/* Nút mở modal xác nhận */}
-              <button
-                type="button"
-                onClick={handleOpenConfirm}
-                disabled={isEnded}
-                className="w-full px-4 py-2.5 rounded-lg bg-indigo-600 text-white font-medium shadow-sm hover:bg-indigo-700 disabled:opacity-50 active:scale-[.99] transition"
-              >
-                Đặt cọc để tham gia
-              </button>
+              {/* Nút mở modal xác nhận / trạng thái đã cọc */}
+              {hasDeposit === true ? (
+                <div className="mt-1 text-xs text-emerald-600">
+                  Bạn đã đặt cọc cho phiên đấu giá này.
+                </div>
+              ) : hasDeposit === false ? (
+                <button
+                  type="button"
+                  onClick={handleOpenConfirm}
+                  disabled={isEnded}
+                  className="w-full mt-2 px-4 py-2.5 rounded-lg bg-indigo-600 text-white font-medium shadow-sm hover:bg-indigo-700 disabled:opacity-50 active:scale-[.99] transition"
+                >
+                  Đặt cọc để tham gia
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full mt-2 px-4 py-2.5 rounded-lg bg-gray-200 text-gray-500 font-medium cursor-wait"
+                >
+                  Đang kiểm tra trạng thái đặt cọc...
+                </button>
+              )}
 
-              {/* Sau khi user đồng ý: hiển thị DepositButton gốc (auto-click một lần nếu có thể) */}
-              {confirmedDeposit && (
-                <div className="rounded-lg border p-3">
+              {/* Sau khi user đồng ý hoặc đã có cọc: hiển thị DepositButton gốc */}
+              {(confirmedDeposit || hasDeposit) && (
+                <div className="rounded-lg border p-3 mt-2">
                   <div className="text-sm mb-2">
                     Đang xử lý đặt cọc {fmtVND(depositAmount)}…
                     <span className="text-gray-500">
@@ -574,7 +801,7 @@ export default function AuctionDetailPage() {
                       isSeller={isSeller}
                       onChanged={() => {
                         setDepVersion((v) => v + 1); // kích BidBox re-check cọc
-                        // Không reset confirmedDeposit để người dùng có thể thấy lại nút nếu cần thanh toán lại
+                        refreshDepositStatus(); // reload trạng thái cọc từ BE
                       }}
                     />
                   </div>
@@ -690,6 +917,7 @@ function ResultPanel({
                 auctionId={auction._id}
                 isWinner={isMeWinner}
                 winningPrice={winnerBid.price}
+                endAt={auction.endAt}
               />
             </>
           )}
@@ -733,6 +961,12 @@ function ConfirmDepositModal({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  const [acceptedRules, setAcceptedRules] = useState(false);
+
+  useEffect(() => {
+    if (open) setAcceptedRules(false);
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -755,8 +989,41 @@ function ConfirmDepositModal({
             <h3 className="text-lg font-semibold">Xác nhận đặt cọc</h3>
             <p className="mt-2 text-sm text-gray-600">
               Bạn sẽ đặt cọc <b>{fmtVND(amount)}</b> để tham gia phiên đấu giá
-              này. Bạn có chắc muốn tiếp tục không?
+              này.
             </p>
+            <ul className="mt-2 text-xs text-gray-600 list-disc list-inside space-y-1">
+              <li>
+                Nếu bạn <b>thắng đấu giá nhưng không tạo lịch hẹn trong 24h</b>,
+                hệ thống sẽ xử lý:
+              </li>
+              <li className="ml-4">
+                Khấu trừ <b>50% tiền cọc</b> (30% chuyển cho người bán, 20% cho
+                hệ thống), 50% còn lại được hoàn về ví của bạn.
+              </li>
+              <li className="ml-4">
+                Tài khoản của bạn có thể bị <b>tạm khóa trong 3 ngày</b>.
+              </li>
+            </ul>
+            <p className="mt-2 text-xs text-gray-600">
+              Vui lòng đọc kỹ điều khoản trước khi tiếp tục.
+            </p>
+            <div className="mt-3 flex items-start gap-2">
+              <input
+                id="deposit-rules"
+                type="checkbox"
+                checked={acceptedRules}
+                onChange={(e) => setAcceptedRules(e.target.checked)}
+                className="mt-[2px] h-4 w-4 rounded border-gray-300"
+              />
+              <label
+                htmlFor="deposit-rules"
+                className="text-xs text-gray-700"
+              >
+                Tôi đã đọc và đồng ý với điều khoản đặt cọc &amp; quy tắc xử lý
+                vi phạm (bao gồm việc khấu trừ tiền cọc và tạm khóa tài khoản
+                trong trường hợp vi phạm).
+              </label>
+            </div>
           </div>
           <div className="px-5 pb-5 flex items-center justify-end gap-2">
             <button
@@ -768,7 +1035,8 @@ function ConfirmDepositModal({
             </button>
             <button
               onClick={onConfirm}
-              className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+              disabled={!acceptedRules}
+              className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
               type="button"
             >
               OK
