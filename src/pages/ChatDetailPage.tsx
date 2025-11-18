@@ -531,6 +531,89 @@ const ChatDetailPage: React.FC = () => {
     }
   };
 
+  const handleOpenCreateAppointmentModal = async () => {
+    if (!chatId || !user) return;
+    const { value: formValues } = await Swal.fire({
+      title: "Đặt lịch xem xe",
+      html: `
+        <input id="swal-date" type="datetime-local" class="swal2-input" placeholder="Thời gian">
+        <input id="swal-location" class="swal2-input" placeholder="Địa điểm (tùy chọn)">
+        <textarea id="swal-notes" class="swal2-textarea" placeholder="Ghi chú (tùy chọn)"></textarea>
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: "Tạo lịch",
+      cancelButtonText: "Hủy",
+      preConfirm: () => {
+        const date = (document.getElementById("swal-date") as HTMLInputElement)
+          ?.value;
+        const location = (
+          document.getElementById("swal-location") as HTMLInputElement
+        )?.value;
+        const notes = (
+          document.getElementById("swal-notes") as HTMLTextAreaElement
+        )?.value;
+        return { date, location, notes };
+      },
+    });
+
+    if (!formValues) return;
+
+    try {
+      const payload: Record<string, any> = { chatId };
+      if (formValues.date) {
+        payload.scheduledDate = new Date(formValues.date).toISOString();
+      }
+      if (formValues.location) {
+        payload.location = formValues.location;
+      }
+      if (formValues.notes) {
+        payload.notes = formValues.notes;
+      }
+
+      const res = await api.post("/appointments/chat", payload);
+
+      Swal.fire({
+        icon: "success",
+        title: "Đã tạo lịch hẹn",
+        text: "Lịch xem xe đã được tạo, chờ bên còn lại xác nhận.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      const appt = res.data.appointment;
+      setMessages((prev) => [
+        ...prev,
+        {
+          _id: `appointment-${appt.id}`,
+          chatId: chatId!,
+          senderId: {
+            _id: user.id,
+            fullName: user.fullName || "Bạn",
+            avatar: user.avatar || "",
+          },
+          content: `📅 Đã tạo lịch xem xe: ${new Date(
+            appt.scheduledDate
+          ).toLocaleString("vi-VN")} tại ${
+            appt.location || "Thỏa thuận thêm trong cuộc trò chuyện"
+          }`,
+          messageType: "text",
+          isRead: true,
+          metadata: { appointmentId: appt.id },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as any,
+      ]);
+    } catch (error: any) {
+      console.error("Error creating appointment from chat:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi",
+        text: error?.response?.data?.message || "Không thể tạo lịch hẹn",
+      });
+    }
+  };
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
 
@@ -943,28 +1026,36 @@ const ChatDetailPage: React.FC = () => {
 
               {/* Listing Info - Compact */}
               {listing && (
-                <Link
-                  to={`/vehicle/${listing._id}`}
-                  className="hidden md:flex items-center space-x-2 bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors group"
-                >
-                  {listing.photos?.[0] && (
-                    <img
-                      src={getImageUrl(listing.photos[0])}
-                      alt="Listing"
-                      className="w-10 h-10 rounded object-cover ring-1 ring-gray-200"
-                    />
-                  )}
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
-                      {listing.make} {listing.model} {listing.year}
-                    </p>
-                    {listing.priceListed && (
-                      <p className="text-xs text-gray-600 font-semibold">
-                        {listing.priceListed.toLocaleString("vi-VN")} đ
-                      </p>
+                <>
+                  <Link
+                    to={`/vehicle/${listing._id}`}
+                    className="hidden md:flex items-center space-x-2 bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors group"
+                  >
+                    {listing.photos?.[0] && (
+                      <img
+                        src={getImageUrl(listing.photos[0])}
+                        alt="Listing"
+                        className="w-10 h-10 rounded object-cover ring-1 ring-gray-200"
+                      />
                     )}
-                  </div>
-                </Link>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
+                        {listing.make} {listing.model} {listing.year}
+                      </p>
+                      {listing.priceListed && (
+                        <p className="text-xs text-gray-600 font-semibold">
+                          {listing.priceListed.toLocaleString("vi-VN")} đ
+                        </p>
+                      )}
+                    </div>
+                  </Link>
+                  <button
+                    onClick={handleOpenCreateAppointmentModal}
+                    className="ml-3 bg-blue-600 text-white px-3 py-2 rounded-lg text-xs md:text-sm hover:bg-blue-700 transition-colors"
+                  >
+                    Đặt lịch xem xe
+                  </button>
+                </>
               )}
             </div>
           </div>
