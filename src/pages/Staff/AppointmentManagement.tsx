@@ -16,9 +16,10 @@ import {
 import api from "../../config/api";
 import Swal from "sweetalert2";
 import ImagePreviewModal from "../../components/ImagePreviewModal";
+import VehicleInspectionModal from "../../components/Staff/VehicleInspectionModal";
 
 // Interface cho appointment detail với thông tin populated
-interface Appointment {
+export interface Appointment {
   _id?: string;
   id?: string;
   appointmentId?: string;
@@ -26,7 +27,13 @@ interface Appointment {
   scheduledDate: string;
   location: string;
   status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "RESCHEDULED";
-  type: "CONTRACT_SIGNING" | "INSPECTION" | "OTHER";
+  type:
+    | "VEHICLE_INSPECTION"
+    | "CONTRACT_SIGNING"
+    | "DELIVERY"
+    | "INSPECTION"
+    | "OTHER"
+    | string;
   appointmentType?: "AUCTION" | "DEPOSIT" | "OTHER";
   contractPhotos?: Array<{ url?: string; photoUrl?: string }>;
   // Populated buyer/seller info
@@ -81,9 +88,20 @@ interface Appointment {
   buyerConfirmedAt?: string;
   sellerConfirmedAt?: string;
   confirmedAt?: string;
+  completedAt?: string;
+  completedByStaffId?: string;
+  completedByStaffName?: string;
+  completedByStaffEmail?: string;
+  completedByStaffPhone?: string;
   staff?: {
     id: string;
     name: string;
+  } | null;
+  completionStaff?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
   } | null;
   createdAt: string;
   updatedAt: string;
@@ -94,6 +112,7 @@ const AppointmentManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterType, setFilterType] = useState<string>("all");
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
@@ -271,6 +290,12 @@ const AppointmentManagement: React.FC = () => {
     }
   };
 
+  const appointmentTypeLabels: Record<string, string> = {
+    VEHICLE_INSPECTION: "Xem xe",
+    CONTRACT_SIGNING: "Ký hợp đồng",
+    DELIVERY: "Bàn giao xe",
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("vi-VN", {
@@ -280,6 +305,11 @@ const AppointmentManagement: React.FC = () => {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const getAppointmentTypeLabel = (type?: string) => {
+    if (!type) return "Khác";
+    return appointmentTypeLabels[type] || type;
   };
 
   const getStatusBadge = (status: string) => {
@@ -316,10 +346,13 @@ const AppointmentManagement: React.FC = () => {
     );
   };
 
-  const filteredAppointments = appointments.filter(
-    (appointment) =>
-      filterStatus === "all" || appointment.status === filterStatus
-  );
+  const filteredAppointments = appointments.filter((appointment) => {
+    const statusMatch =
+      filterStatus === "all" || appointment.status === filterStatus;
+    const typeMatch =
+      filterType === "all" || appointment.type === filterType;
+    return statusMatch && typeMatch;
+  });
 
   const toggleDropdown = (appointmentId: string) => {
     setDropdownOpen(dropdownOpen === appointmentId ? null : appointmentId);
@@ -931,6 +964,82 @@ const AppointmentManagement: React.FC = () => {
     }
   };
 
+  const handleCompleteInspection = async () => {
+    if (!selectedAppointment) return;
+    const appointmentId =
+      selectedAppointment.appointmentId || selectedAppointment._id;
+
+    if (!appointmentId) {
+      Swal.fire({
+        icon: "warning",
+        title: "Thiếu mã lịch hẹn",
+        text: "Không thể xác định lịch hẹn để cập nhật.",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+
+    try {
+      const response = await api.post(`/appointments/${appointmentId}/complete`);
+
+      if (response.data.success) {
+        Swal.fire({
+          icon: "success",
+          title: "Đã xác nhận",
+          text:
+            response.data.message || "Đã đánh dấu buổi xem xe hoàn thành thành công",
+          confirmButtonColor: "#2563eb",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        await fetchAppointments();
+        closeModal();
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Lỗi!",
+          text:
+            response.data.message ||
+            "Không thể cập nhật trạng thái lịch hẹn. Vui lòng thử lại.",
+          confirmButtonColor: "#2563eb",
+        });
+      }
+    } catch (error) {
+      console.error("Error completing inspection appointment:", error);
+      const axiosError = error as {
+        response?: { data?: { message?: string } };
+      };
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi hệ thống!",
+        text:
+          axiosError.response?.data?.message ||
+          "Không thể xác nhận buổi xem xe. Vui lòng thử lại sau.",
+        confirmButtonColor: "#2563eb",
+      });
+    }
+  };
+
+  const handleHoldVehicle = async () => {
+    if (!selectedAppointment) return;
+    Swal.fire({
+      icon: "info",
+      title: "Giữ xe",
+      text: "Tính năng giữ xe sẽ được cập nhật sớm.",
+      confirmButtonColor: "#2563eb",
+    });
+  };
+
+  const handleBuyNow = async () => {
+    if (!selectedAppointment) return;
+    Swal.fire({
+      icon: "info",
+      title: "Mua ngay",
+      text: "Tính năng mua ngay sẽ được cập nhật sớm.",
+      confirmButtonColor: "#2563eb",
+    });
+  };
+
   const createPlaceholder = (length: number = 80) => {
     return ".".repeat(length);
   };
@@ -1205,6 +1314,74 @@ const AppointmentManagement: React.FC = () => {
     `.trim();
   };
 
+  const renderConfirmationSection = (appointment?: Appointment | null) => {
+    const targetAppointment = appointment || selectedAppointment;
+    if (
+      !targetAppointment ||
+      targetAppointment.type !== "VEHICLE_INSPECTION"
+    )
+      return null;
+
+    const buyerConfirmed =
+      targetAppointment.buyerConfirmed ??
+      targetAppointment.confirmation?.buyerConfirmed;
+    const sellerConfirmed =
+      targetAppointment.sellerConfirmed ??
+      targetAppointment.confirmation?.sellerConfirmed;
+
+    const buyerConfirmedAt = targetAppointment.buyerConfirmedAt;
+    const sellerConfirmedAt = targetAppointment.sellerConfirmedAt;
+
+    const staffName =
+      targetAppointment.completedByStaffName ||
+      targetAppointment.completionStaff?.name ||
+      targetAppointment.staff?.name ||
+      "Chưa phân công";
+
+    return (
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <p className="text-sm text-gray-500">Bên mua</p>
+          <p
+            className={`mt-2 text-lg font-semibold ${
+              buyerConfirmed ? "text-green-600" : "text-yellow-600"
+            }`}
+          >
+            {buyerConfirmed ? "Đã xác nhận" : "Chưa xác nhận"}
+          </p>
+          {buyerConfirmedAt && (
+            <p className="text-xs text-gray-500 mt-1">
+              {formatDate(buyerConfirmedAt)}
+            </p>
+          )}
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <p className="text-sm text-gray-500">Bên bán</p>
+          <p
+            className={`mt-2 text-lg font-semibold ${
+              sellerConfirmed ? "text-green-600" : "text-yellow-600"
+            }`}
+          >
+            {sellerConfirmed ? "Đã xác nhận" : "Chưa xác nhận"}
+          </p>
+          {sellerConfirmedAt && (
+            <p className="text-xs text-gray-500 mt-1">
+              {formatDate(sellerConfirmedAt)}
+            </p>
+          )}
+        </div>
+        <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-4">
+          <p className="text-sm font-medium text-indigo-700">
+            Nhân viên phụ trách
+          </p>
+          <p className="mt-2 text-lg font-semibold text-indigo-900">
+            {staffName}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   const downloadContractPDF = (content: string) => {
     // Tạo window mới để in
     const printWindow = window.open("", "_blank");
@@ -1313,20 +1490,39 @@ const AppointmentManagement: React.FC = () => {
 
       {/* Filter */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center space-x-4">
-          <span className="text-sm font-medium text-gray-700">
-            Lọc theo trạng thái:
-          </span>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">Tất cả</option>
-            <option value="CONFIRMED">Chờ xử lý</option>
-            <option value="COMPLETED">Đã hoàn thành</option>
-            <option value="CANCELLED">Đã hủy</option>
-          </select>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:space-x-6">
+          <div className="flex items-center space-x-3">
+            <span className="text-sm font-medium text-gray-700">
+              Lọc theo trạng thái:
+            </span>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Tất cả</option>
+              <option value="CONFIRMED">Chờ xử lý</option>
+              <option value="COMPLETED">Đã hoàn thành</option>
+              <option value="CANCELLED">Đã hủy</option>
+            </select>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <span className="text-sm font-medium text-gray-700">
+              Lọc theo loại:
+            </span>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Tất cả</option>
+              <option value="VEHICLE_INSPECTION">Xem xe</option>
+              <option value="CONTRACT_SIGNING">Ký hợp đồng</option>
+              <option value="DELIVERY">Bàn giao xe</option>
+            </select>
+          </div>
+
           <span className="text-sm text-gray-500">
             Hiển thị {filteredAppointments.length} / {appointments.length} lịch
             hẹn
@@ -1398,6 +1594,11 @@ const AppointmentManagement: React.FC = () => {
                                 ? "Đấu giá"
                                 : "Đặt cọc"}
                             </div>
+                          )}
+                          {appointment.type && (
+                            <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                              {getAppointmentTypeLabel(appointment.type)}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -1531,7 +1732,9 @@ const AppointmentManagement: React.FC = () => {
       </div>
 
       {/* Modal Chi tiết */}
-      {isModalOpen && selectedAppointment && (
+      {isModalOpen &&
+        selectedAppointment &&
+        selectedAppointment.type !== "VEHICLE_INSPECTION" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             {/* Header */}
@@ -1628,6 +1831,8 @@ const AppointmentManagement: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {renderConfirmationSection()}
 
               {/* Hai bên */}
               <div className="grid grid-cols-2 gap-6">
@@ -2121,6 +2326,22 @@ const AppointmentManagement: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+      {selectedAppointment && (
+        <VehicleInspectionModal
+          appointment={selectedAppointment}
+          isOpen={
+            isModalOpen &&
+            selectedAppointment.type === "VEHICLE_INSPECTION"
+          }
+          onClose={closeModal}
+          onConfirmInspection={handleCompleteInspection}
+          onCancelAppointment={handleCancelTransaction}
+          onHoldVehicle={handleHoldVehicle}
+          onBuyNow={handleBuyNow}
+          renderConfirmationSection={renderConfirmationSection}
+          formatDate={formatDate}
+        />
       )}
 
       {/* Image Preview Modal */}
