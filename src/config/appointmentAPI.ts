@@ -21,8 +21,15 @@ export interface Appointment {
   };
   scheduledDate: string;
   location: string;
-  status: "PENDING" | "CONFIRMED" | "RESCHEDULED" | "CANCELLED" | "COMPLETED";
-  type: "CONTRACT_SIGNING" | "INSPECTION" | "OTHER";
+  status:
+    | "PENDING"
+    | "CONFIRMED"
+    | "RESCHEDULED"
+    | "CANCELLED"
+    | "COMPLETED"
+    | "WAITING_REMAINING_PAYMENT"
+    | "AWAITING_REMAINING_PAYMENT";
+  type: "CONTRACT_SIGNING" | "INSPECTION" | "VEHICLE_INSPECTION" | "OTHER";
   notes?: string;
   buyerConfirmed: boolean;
   sellerConfirmed: boolean;
@@ -68,7 +75,10 @@ export const createAppointmentFromAuction = async (
     notes?: string;
   }
 ): Promise<CreateAppointmentResponse> => {
-  const response = await api.post(`/appointments/auction/${auctionId}`, payload || {});
+  const response = await api.post(
+    `/appointments/auction/${auctionId}`,
+    payload || {}
+  );
   return response.data;
 };
 
@@ -125,6 +135,33 @@ export const getAppointmentById = async (appointmentId: string) => {
 };
 
 /**
+ * Thanh toán phần còn lại (Buyer only)
+ */
+export interface PayRemainingResponse {
+  paymentUrl?: string;
+  qrCodeUrl?: string; // backward compatibility
+  amount?: number;
+}
+
+export const payRemaining = async (
+  appointmentId: string
+): Promise<PayRemainingResponse> => {
+  const response = await api.post(
+    `/appointments/${appointmentId}/remaining-payment`,
+    {}
+  );
+  return response.data;
+};
+
+/**
+ * Lấy chi tiết lịch hẹn dành cho staff (bao gồm thông tin nhân viên phụ trách)
+ */
+export const getStaffAppointmentDetail = async (appointmentId: string) => {
+  const response = await api.get(`/appointments/staff/${appointmentId}`);
+  return response.data;
+};
+
+/**
  * 17. Xem thông tin hợp đồng
  */
 export const getContract = async (appointmentId: string) => {
@@ -137,7 +174,10 @@ export const getContract = async (appointmentId: string) => {
 /**
  * 18. Upload ảnh hợp đồng đã ký (STAFF only)
  */
-export const uploadContractPhotos = (appointmentId: string, formData: FormData) =>
+export const uploadContractPhotos = (
+  appointmentId: string,
+  formData: FormData
+) =>
   api.post(`/contracts/${appointmentId}/upload-photos`, formData, {
     headers: {
       "Content-Type": "multipart/form-data",

@@ -1,10 +1,11 @@
 import React from "react";
-import { X, ExternalLink, Loader2 } from "lucide-react";
+import { X, ExternalLink } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 interface QRPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  qrCode: string; // base64 image
+  qrCode: string; // base64 image hoặc URL
   paymentUrl?: string;
   amount: number;
   title: string;
@@ -67,12 +68,29 @@ const QRPaymentModal: React.FC<QRPaymentModalProps> = ({
 
         {/* QR Code */}
         <div className="flex justify-center mb-6">
-          <div className="bg-white p-4 rounded-lg border-2 border-gray-200">
-            <img
-              src={qrCode}
-              alt="QR Code thanh toán"
-              className="w-64 h-64 object-contain"
-            />
+          <div className="bg-white p-4 rounded-lg border-2 border-gray-200 flex items-center justify-center">
+            {qrCode.startsWith("data:image") ||
+            (qrCode.startsWith("http") &&
+              (qrCode.match(/\.(png|jpg|jpeg|gif|webp|svg)(\?|$)/i) ||
+                qrCode.includes("/qr") ||
+                qrCode.includes("qrcode"))) ? (
+              // Nếu là base64 image hoặc URL ảnh QR code, hiển thị bằng img tag
+              <img
+                src={qrCode}
+                alt="QR Code thanh toán"
+                className="w-64 h-64 object-contain"
+              />
+            ) : (
+              // Nếu là URL thanh toán, tạo QR code từ paymentUrl hoặc qrCode
+              <QRCodeSVG
+                value={paymentUrl || qrCode}
+                size={256}
+                level="H"
+                includeMargin={true}
+                bgColor="#FFFFFF"
+                fgColor="#000000"
+              />
+            )}
           </div>
         </div>
 
@@ -122,4 +140,3 @@ const QRPaymentModal: React.FC<QRPaymentModalProps> = ({
 };
 
 export default QRPaymentModal;
-

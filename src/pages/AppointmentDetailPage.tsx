@@ -5,6 +5,7 @@ import {
   confirmAppointment,
   rejectAppointment,
   cancelAppointment,
+  getStaffAppointmentDetail,
   type Appointment,
 } from "../config/appointmentAPI";
 import { useAuth } from "../contexts/AuthContext";
@@ -17,6 +18,14 @@ import {
   Clock,
 } from "lucide-react";
 import Swal from "sweetalert2";
+import RemainingPaymentButton from "../components/Appointment/RemainingPaymentButton";
+
+type StaffInfo = {
+  id?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+};
 
 export default function AppointmentDetailPage() {
   const { appointmentId } = useParams<{ appointmentId: string }>();
@@ -29,13 +38,79 @@ export default function AppointmentDetailPage() {
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
+  const [staffLoading, setStaffLoading] = useState(false);
+
+  const extractStaffInfo = (source: unknown): StaffInfo | null => {
+    if (!source || typeof source !== "object") return null;
+    const data = source as Record<string, unknown>;
+    const rawStaff = (data.staff ||
+      data.assignedStaff ||
+      data.staffInfo ||
+      data.completionStaff ||
+      data.completionStaffInfo) as Record<string, unknown> | undefined;
+
+    const name =
+      (rawStaff?.name as string | undefined) ||
+      (rawStaff?.fullName as string | undefined) ||
+      (data.completedByStaffName as string | undefined) ||
+      (data.staffName as string | undefined);
+    const email =
+      (rawStaff?.email as string | undefined) ||
+      (data.completedByStaffEmail as string | undefined) ||
+      (rawStaff?.contactEmail as string | undefined);
+    const phone =
+      (rawStaff?.phone as string | undefined) ||
+      (data.completedByStaffPhone as string | undefined) ||
+      (rawStaff?.contactPhone as string | undefined);
+    const id =
+      (rawStaff?._id as string | undefined) ||
+      (rawStaff?.id as string | undefined) ||
+      (data.completedByStaffId as string | undefined);
+
+    if (name || email || phone) {
+      return { id, name, email, phone };
+    }
+
+    return null;
+  };
+
+  const fetchStaffInfo = async (id: string) => {
+    setStaffLoading(true);
+    try {
+      const response = await getStaffAppointmentDetail(id);
+      const detail =
+        response?.data ||
+        response?.appointment ||
+        response?.assignment ||
+        response;
+      const info = extractStaffInfo(detail);
+      setStaffInfo(info);
+    } catch (error) {
+      console.error("Error fetching staff detail:", error);
+    } finally {
+      setStaffLoading(false);
+    }
+  };
 
   const loadAppointment = async () => {
     if (!appointmentId) return;
     setLoading(true);
+    setStaffInfo(null);
     try {
       const response = await getAppointmentById(appointmentId);
-      setAppointment(response.data.appointment || response.data);
+      const appointmentData = response.data.appointment || response.data;
+      setAppointment(appointmentData);
+      const localStaff = extractStaffInfo(appointmentData);
+      if (localStaff) {
+        setStaffInfo(localStaff);
+      }
+      const resolvedId =
+        (appointmentData && (appointmentData._id || appointmentData.id)) ||
+        appointmentId;
+      if (resolvedId) {
+        void fetchStaffInfo(resolvedId);
+      }
     } catch (error) {
       console.error("Error loading appointment:", error);
       Swal.fire({
@@ -223,12 +298,19 @@ export default function AppointmentDetailPage() {
     );
   }
 
+  const awaitingStatuses = [
+    "WAITING_REMAINING_PAYMENT",
+    "AWAITING_REMAINING_PAYMENT",
+  ];
+
   const statusColors = {
     PENDING: "bg-yellow-100 text-yellow-800",
     CONFIRMED: "bg-green-100 text-green-800",
     RESCHEDULED: "bg-blue-100 text-blue-800",
     CANCELLED: "bg-red-100 text-red-800",
     COMPLETED: "bg-gray-100 text-gray-800",
+    WAITING_REMAINING_PAYMENT: "bg-orange-100 text-orange-800",
+    AWAITING_REMAINING_PAYMENT: "bg-orange-100 text-orange-800",
   };
 
   const statusLabels = {
@@ -237,6 +319,8 @@ export default function AppointmentDetailPage() {
     RESCHEDULED: "Đã dời lịch",
     CANCELLED: "Đã hủy",
     COMPLETED: "Đã hoàn thành",
+    WAITING_REMAINING_PAYMENT: "Chờ thanh toán phần còn lại",
+    AWAITING_REMAINING_PAYMENT: "Chờ thanh toán phần còn lại",
   };
 
   return (
@@ -263,6 +347,26 @@ export default function AppointmentDetailPage() {
             {statusLabels[appointment.status]}
           </span>
         </div>
+
+        {/* Remaining Payment Button - Nổi bật ngay dưới status */}
+        {awaitingStatuses.includes(appointment.status) && isBuyer && (
+          <div className="mb-6 bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-lg text-gray-900 mb-1">
+                  Thanh toán phần còn lại
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Vui lòng thanh toán số tiền còn lại để hoàn tất giao dịch
+                </p>
+              </div>
+              <RemainingPaymentButton
+                appointmentId={appointmentId || ""}
+                onPaymentSuccess={loadAppointment}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Main Info */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
@@ -377,6 +481,42 @@ export default function AppointmentDetailPage() {
               </div>
             </div>
           </div>
+
+          {/* Staff in charge */}
+          {appointment.type === "INSPECTION" ||
+          appointment.type === "VEHICLE_INSPECTION" ? (
+            <div className="border-t mt-6 pt-6">
+              <h3 className="font-semibold mb-3">Nhân viên phụ trách</h3>
+              <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-4">
+                {staffLoading ? (
+                  <p className="text-sm text-gray-600">
+                    Đang tải thông tin nhân viên...
+                  </p>
+                ) : staffInfo ? (
+                  <>
+                    <p className="text-lg font-semibold text-indigo-900">
+                      {staffInfo.name || "Chưa cập nhật"}
+                    </p>
+                    {staffInfo.email && (
+                      <p className="text-sm text-gray-700">{staffInfo.email}</p>
+                    )}
+                    {staffInfo.phone && (
+                      <p className="text-sm text-gray-700">{staffInfo.phone}</p>
+                    )}
+                    {!(staffInfo.email || staffInfo.phone) && (
+                      <p className="text-sm text-gray-600">
+                        Chưa có thông tin liên hệ.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-600">
+                    Chưa phân công nhân viên phụ trách.
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Actions */}
