@@ -6,6 +6,7 @@ import {
 } from "../../config/appointmentAPI";
 import { useAuth } from "../../contexts/AuthContext";
 import { Calendar, MapPin, User, Store, Filter } from "lucide-react";
+import RemainingPaymentButton from "../Appointment/RemainingPaymentButton";
 
 export default function AppointmentsTab() {
   const navigate = useNavigate();
@@ -64,12 +65,20 @@ export default function AppointmentsTab() {
     return true;
   });
 
+  const awaitingStatuses = [
+    "WAITING_REMAINING_PAYMENT",
+    "AWAITING_REMAINING_PAYMENT",
+  ];
+
   const statusColors = {
     PENDING: "bg-yellow-100 text-yellow-800 border-yellow-200",
     CONFIRMED: "bg-green-100 text-green-800 border-green-200",
     RESCHEDULED: "bg-blue-100 text-blue-800 border-blue-200",
     CANCELLED: "bg-red-100 text-red-800 border-red-200",
     COMPLETED: "bg-gray-100 text-gray-800 border-gray-200",
+    WAITING_REMAINING_PAYMENT: "bg-orange-100 text-orange-800 border-orange-200",
+    AWAITING_REMAINING_PAYMENT:
+      "bg-orange-100 text-orange-800 border-orange-200",
   };
 
   const statusLabels = {
@@ -78,6 +87,8 @@ export default function AppointmentsTab() {
     RESCHEDULED: "Đã dời lịch",
     CANCELLED: "Đã hủy",
     COMPLETED: "Đã hoàn thành",
+    WAITING_REMAINING_PAYMENT: "Chờ thanh toán phần còn lại",
+    AWAITING_REMAINING_PAYMENT: "Chờ thanh toán phần còn lại",
   };
 
   const renderAppointmentCard = (appointment: Appointment) => {
@@ -158,10 +169,10 @@ export default function AppointmentsTab() {
 
           <span
             className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              statusColors[appointment.status]
+              statusColors[appointment.status] || "bg-gray-100 text-gray-800"
             }`}
           >
-            {statusLabels[appointment.status]}
+            {statusLabels[appointment.status] || appointment.status}
           </span>
         </div>
 
@@ -182,6 +193,28 @@ export default function AppointmentsTab() {
           <div className="mt-3 pt-3 border-t">
             <p className="text-xs text-gray-500">Ghi chú:</p>
             <p className="text-sm">{appointment.notes}</p>
+          </div>
+        )}
+
+        {isBuyer && awaitingStatuses.includes(appointment.status) && (
+          <div
+            className="mt-3 pt-3 border-t"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">
+                  Thanh toán phần còn lại
+                </p>
+                <p className="text-xs text-gray-500">
+                  Vui lòng hoàn tất thanh toán để nhận xe
+                </p>
+              </div>
+              <RemainingPaymentButton
+                appointmentId={appointment._id}
+                onPaymentSuccess={loadAppointments}
+              />
+            </div>
           </div>
         )}
 
@@ -278,6 +311,9 @@ export default function AppointmentsTab() {
               <option value="RESCHEDULED">Đã dời lịch</option>
               <option value="CANCELLED">Đã hủy</option>
               <option value="COMPLETED">Đã hoàn thành</option>
+              <option value="AWAITING_REMAINING_PAYMENT">
+                Chờ thanh toán phần còn lại
+              </option>
             </select>
           </div>
 

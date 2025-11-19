@@ -1,31 +1,29 @@
 import React from "react";
-import { CheckCircle, XCircle } from "lucide-react";
+import { XCircle } from "lucide-react";
 import type { Appointment } from "../../pages/Staff/AppointmentManagement";
 
 interface VehicleInspectionModalProps {
   appointment: Appointment;
   isOpen: boolean;
   onClose: () => void;
-  onConfirmInspection: () => void;
-  onCancelAppointment: () => void;
   onHoldVehicle: () => void;
   onBuyNow: () => void;
   renderConfirmationSection: (
     appointment?: Appointment | null
   ) => React.ReactNode;
   formatDate: (dateString: string) => string;
+  staffLoading?: boolean;
 }
 
 const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   appointment,
   isOpen,
   onClose,
-  onConfirmInspection,
-  onCancelAppointment,
   onHoldVehicle,
   onBuyNow,
   renderConfirmationSection,
   formatDate,
+  staffLoading = false,
 }) => {
   if (!isOpen) return null;
 
@@ -137,26 +135,8 @@ const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             </div>
           </div>
 
-          <div className="mt-8 space-y-4">
-            {appointment.status === "CONFIRMED" && (
-              <>
-                <button
-                  onClick={onConfirmInspection}
-                  className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  Xác nhận đã xem xe
-                </button>
-                <button
-                  onClick={onCancelAppointment}
-                  className="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
-                >
-                  Hủy lịch hẹn
-                </button>
-              </>
-            )}
-
-            {appointment.status === "COMPLETED" && (
+          {appointment.status === "CONFIRMED" && (
+            <div className="mt-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <button
                   onClick={onHoldVehicle}
@@ -171,8 +151,8 @@ const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   Mua ngay
                 </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
