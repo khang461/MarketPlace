@@ -1121,9 +1121,7 @@ const AppointmentManagement: React.FC = () => {
 
       const proofsResponse =
         response.data?.data?.proofs || response.data?.proofs || [];
-      const updatedProofs = Array.isArray(proofsResponse)
-        ? proofsResponse
-        : [];
+      const updatedProofs = Array.isArray(proofsResponse) ? proofsResponse : [];
 
       setNotarizationProofs(updatedProofs);
       setNotarizationProofFiles([]);
@@ -1237,9 +1235,7 @@ const AppointmentManagement: React.FC = () => {
 
       const proofsResponse =
         response.data?.data?.proofs || response.data?.proofs || [];
-      const updatedProofs = Array.isArray(proofsResponse)
-        ? proofsResponse
-        : [];
+      const updatedProofs = Array.isArray(proofsResponse) ? proofsResponse : [];
 
       setHandoverProofs(updatedProofs);
       setHandoverProofFiles([]);
@@ -2139,27 +2135,35 @@ const AppointmentManagement: React.FC = () => {
                       {getStatusBadge(appointment.status)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-4">
                         <button
                           onClick={() => openModal(appointment)}
-                          className="text-blue-600 hover:text-blue-900 flex items-center"
+                          className="text-blue-600 hover:text-blue-900 relative group"
+                          title="Xem chi tiết"
                         >
-                          <Eye className="w-4 h-4 mr-1" />
-                          Xem chi tiết
+                          <Eye className="w-4 h-4" />
+                          <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                            Xem chi tiết
+                          </span>
                         </button>
 
                         {appointment.status === "COMPLETED" &&
                           appointment.type !== "VEHICLE_INSPECTION" &&
-                          !(appointment.contractPhotos &&
-                            appointment.contractPhotos.length >= 6) && (
-                          <button
-                            onClick={() => openModal(appointment)}
-                            className="text-purple-600 hover:text-purple-900 flex items-center"
-                          >
-                            <FileText className="w-4 h-4 mr-1" />
-                            Ký hợp đồng
-                          </button>
-                        )}
+                          !(
+                            appointment.contractPhotos &&
+                            appointment.contractPhotos.length >= 6
+                          ) && (
+                            <button
+                              onClick={() => openModal(appointment)}
+                              className="text-purple-600 hover:text-purple-900 relative group"
+                              title="Ký hợp đồng"
+                            >
+                              <FileText className="w-4 h-4" />
+                              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                Ký hợp đồng
+                              </span>
+                            </button>
+                          )}
 
                         {appointment.status === "CONFIRMED" && (
                           <div className="relative dropdown-menu-container">
@@ -2339,49 +2343,517 @@ const AppointmentManagement: React.FC = () => {
 
                 {selectedAppointment.type !== "CONTRACT_NOTARIZATION" &&
                   selectedAppointment.type !== "VEHICLE_HANDOVER" && (
-                  <>
-                    {/* Hai bên */}
-                    <div className="grid grid-cols-2 gap-6">
-                  {/* Bên Bán */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-orange-700 mb-3">
-                      🟠 Bên Bán
-                    </h3>
-                    <div className="bg-orange-50 rounded-lg p-4 mb-4">
-                      <p className="text-gray-700">
-                        <span className="font-medium">Tên:</span>{" "}
-                        {selectedAppointment.seller?.name || "N/A"}
-                      </p>
-                      <p className="text-gray-700 mt-2">
-                        <span className="font-medium">Email:</span>{" "}
-                        {selectedAppointment.seller?.email || "N/A"}
-                      </p>
-                      <p className="text-gray-700 mt-2">
-                        <span className="font-medium">Số điện thoại:</span>{" "}
-                        {selectedAppointment.seller?.phone || "N/A"}
-                      </p>
-                    </div>
-
-                    {/* Upload ảnh cho bên bán */}
-                    {["CONFIRMED", "COMPLETED"].includes(
-                      selectedAppointment.status ?? ""
-                    ) &&
-                      (!contractPhotos.seller ||
-                        contractPhotos.seller.length < 3 ||
-                        !contractPhotos.buyer ||
-                        contractPhotos.buyer.length < 3) && (
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-medium text-gray-700">
-                          Upload ảnh hợp đồng (Bên Bán)
-                        </h4>
-                        {/* Hiển thị ảnh đã upload */}
-                        {contractPhotos.seller.length > 0 && (
-                          <div className="mb-3">
-                            <p className="text-xs text-gray-500 mb-2">
-                              Ảnh đã upload ({contractPhotos.seller.length}/3):
+                    <>
+                      {/* Hai bên */}
+                      <div className="grid grid-cols-2 gap-6">
+                        {/* Bên Bán */}
+                        <div>
+                          <h3 className="text-lg font-semibold text-orange-700 mb-3">
+                            🟠 Bên Bán
+                          </h3>
+                          <div className="bg-orange-50 rounded-lg p-4 mb-4">
+                            <p className="text-gray-700">
+                              <span className="font-medium">Tên:</span>{" "}
+                              {selectedAppointment.seller?.name || "N/A"}
                             </p>
-                            <div className="grid grid-cols-3 gap-2">
-                              {contractPhotos.seller.map((photo, index) => {
+                            <p className="text-gray-700 mt-2">
+                              <span className="font-medium">Email:</span>{" "}
+                              {selectedAppointment.seller?.email || "N/A"}
+                            </p>
+                            <p className="text-gray-700 mt-2">
+                              <span className="font-medium">
+                                Số điện thoại:
+                              </span>{" "}
+                              {selectedAppointment.seller?.phone || "N/A"}
+                            </p>
+                          </div>
+
+                          {/* Upload ảnh cho bên bán */}
+                          {["CONFIRMED", "COMPLETED"].includes(
+                            selectedAppointment.status ?? ""
+                          ) &&
+                            (!contractPhotos.seller ||
+                              contractPhotos.seller.length < 3 ||
+                              !contractPhotos.buyer ||
+                              contractPhotos.buyer.length < 3) && (
+                              <div className="space-y-3">
+                                <h4 className="text-sm font-medium text-gray-700">
+                                  Upload ảnh hợp đồng (Bên Bán)
+                                </h4>
+                                {/* Hiển thị ảnh đã upload */}
+                                {contractPhotos.seller.length > 0 && (
+                                  <div className="mb-3">
+                                    <p className="text-xs text-gray-500 mb-2">
+                                      Ảnh đã upload (
+                                      {contractPhotos.seller.length}/3):
+                                    </p>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {contractPhotos.seller.map(
+                                        (photo, index) => {
+                                          const imageUrl = photo.startsWith(
+                                            "http"
+                                          )
+                                            ? photo
+                                            : `${api.defaults.baseURL || ""}${
+                                                photo.startsWith("/")
+                                                  ? photo
+                                                  : "/" + photo
+                                              }`;
+                                          return (
+                                            <div
+                                              key={index}
+                                              className="relative group"
+                                            >
+                                              <div
+                                                className="cursor-pointer"
+                                                onClick={() =>
+                                                  openImagePreview(
+                                                    contractPhotos.seller,
+                                                    index
+                                                  )
+                                                }
+                                              >
+                                                <img
+                                                  src={imageUrl}
+                                                  alt={`Seller photo ${
+                                                    index + 1
+                                                  }`}
+                                                  className="w-full h-24 object-cover rounded-lg border-2 border-orange-200 hover:border-orange-400 transition-colors"
+                                                  onError={(e) => {
+                                                    console.error(
+                                                      "Error loading seller image:",
+                                                      photo,
+                                                      "Full URL:",
+                                                      imageUrl
+                                                    );
+                                                    (
+                                                      e.target as HTMLImageElement
+                                                    ).src =
+                                                      "https://via.placeholder.com/150?text=Error";
+                                                  }}
+                                                />
+                                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all pointer-events-none">
+                                                  <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                </div>
+                                              </div>
+                                              {/* Nút xóa ảnh */}
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleDeletePhoto(
+                                                    photo,
+                                                    "seller",
+                                                    index
+                                                  );
+                                                }}
+                                                className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                                title="Xóa ảnh"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </button>
+                                            </div>
+                                          );
+                                        }
+                                      )}
+                                      {/* Hiển thị placeholder cho slot trống */}
+                                      {Array.from({
+                                        length:
+                                          3 - contractPhotos.seller.length,
+                                      }).map((_, index) => (
+                                        <div
+                                          key={`empty-${index}`}
+                                          className="w-full h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50"
+                                        >
+                                          <span className="text-xs text-gray-400">
+                                            Trống
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Preview ảnh chưa upload */}
+                                {previewFiles.seller.length > 0 && (
+                                  <div className="mb-3">
+                                    <p className="text-xs text-orange-600 mb-2 font-medium">
+                                      Ảnh đã chọn (chưa upload) (
+                                      {previewFiles.seller.length}/3):
+                                    </p>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {previewFiles.seller.map(
+                                        (file, index) => {
+                                          const previewUrl =
+                                            createPreviewUrl(file);
+                                          return (
+                                            <div
+                                              key={index}
+                                              className="relative group"
+                                            >
+                                              <div
+                                                className="cursor-pointer"
+                                                onClick={() => {
+                                                  const previewUrls =
+                                                    previewFiles.seller.map(
+                                                      (f) => createPreviewUrl(f)
+                                                    );
+                                                  setPreviewImages(previewUrls);
+                                                  setPreviewIndex(index);
+                                                  setIsPreviewOpen(true);
+                                                }}
+                                              >
+                                                <img
+                                                  src={previewUrl}
+                                                  alt={`Preview ${index + 1}`}
+                                                  className="w-full h-24 object-cover rounded-lg border-2 border-orange-300 hover:border-orange-500 transition-colors"
+                                                />
+                                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all pointer-events-none">
+                                                  <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                </div>
+                                              </div>
+                                              {/* Nút xóa preview */}
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleRemovePreviewFile(
+                                                    "seller",
+                                                    index
+                                                  );
+                                                  URL.revokeObjectURL(
+                                                    previewUrl
+                                                  );
+                                                }}
+                                                className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                                title="Xóa khỏi preview"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </button>
+                                            </div>
+                                          );
+                                        }
+                                      )}
+                                      {/* Hiển thị placeholder cho slot trống */}
+                                      {Array.from({
+                                        length: 3 - previewFiles.seller.length,
+                                      }).map((_, index) => (
+                                        <div
+                                          key={`empty-preview-${index}`}
+                                          className="w-full h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50"
+                                        >
+                                          <span className="text-xs text-gray-400">
+                                            Trống
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Input chọn file - chỉ hiển thị khi còn slot */}
+                                {contractPhotos.seller.length +
+                                  previewFiles.seller.length <
+                                  3 && (
+                                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-3">
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      multiple
+                                      onChange={(e) =>
+                                        handleFileSelect(e, "seller")
+                                      }
+                                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+                                    />
+                                    <p className="text-xs text-gray-400 mt-1">
+                                      Còn{" "}
+                                      {3 -
+                                        (contractPhotos.seller.length +
+                                          previewFiles.seller.length)}{" "}
+                                      slot trống
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Yêu cầu đủ 3 ảnh mỗi bên mới cho phép upload */}
+                                <p className="text-xs text-gray-500">
+                                  Cần đủ các mặt của hợp đồng để có thể upload.
+                                </p>
+
+                                {contractPhotos.seller.length === 0 &&
+                                  previewFiles.seller.length === 0 && (
+                                    <div className="mb-3 text-xs text-gray-400">
+                                      Chưa có ảnh nào được chọn
+                                    </div>
+                                  )}
+                              </div>
+                            )}
+                        </div>
+
+                        {/* Bên Mua */}
+                        <div>
+                          <h3 className="text-lg font-semibold text-green-700 mb-3">
+                            🟢 Bên Mua
+                          </h3>
+                          <div className="bg-green-50 rounded-lg p-4 mb-4">
+                            <p className="text-gray-700">
+                              <span className="font-medium">Tên:</span>{" "}
+                              {selectedAppointment.buyer?.name || "N/A"}
+                            </p>
+                            <p className="text-gray-700 mt-2">
+                              <span className="font-medium">Email:</span>{" "}
+                              {selectedAppointment.buyer?.email || "N/A"}
+                            </p>
+                            <p className="text-gray-700 mt-2">
+                              <span className="font-medium">
+                                Số điện thoại:
+                              </span>{" "}
+                              {selectedAppointment.buyer?.phone || "N/A"}
+                            </p>
+                          </div>
+
+                          {/* Upload ảnh cho bên mua */}
+                          {["CONFIRMED", "COMPLETED"].includes(
+                            selectedAppointment.status ?? ""
+                          ) &&
+                            (!contractPhotos.seller ||
+                              contractPhotos.seller.length < 3 ||
+                              !contractPhotos.buyer ||
+                              contractPhotos.buyer.length < 3) && (
+                              <div className="space-y-3">
+                                <h4 className="text-sm font-medium text-gray-700">
+                                  Upload ảnh hợp đồng (Bên Mua)
+                                </h4>
+                                {/* Hiển thị ảnh đã upload */}
+                                {contractPhotos.buyer.length > 0 && (
+                                  <div className="mb-3">
+                                    <p className="text-xs text-gray-500 mb-2">
+                                      Ảnh đã upload (
+                                      {contractPhotos.buyer.length}/3):
+                                    </p>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {contractPhotos.buyer.map(
+                                        (photo, index) => {
+                                          const imageUrl = photo.startsWith(
+                                            "http"
+                                          )
+                                            ? photo
+                                            : `${api.defaults.baseURL || ""}${
+                                                photo.startsWith("/")
+                                                  ? photo
+                                                  : "/" + photo
+                                              }`;
+                                          return (
+                                            <div
+                                              key={index}
+                                              className="relative group"
+                                            >
+                                              <div
+                                                className="cursor-pointer"
+                                                onClick={() =>
+                                                  openImagePreview(
+                                                    contractPhotos.buyer,
+                                                    index
+                                                  )
+                                                }
+                                              >
+                                                <img
+                                                  src={imageUrl}
+                                                  alt={`Buyer photo ${
+                                                    index + 1
+                                                  }`}
+                                                  className="w-full h-24 object-cover rounded-lg border-2 border-green-200 hover:border-green-400 transition-colors"
+                                                  onError={(e) => {
+                                                    console.error(
+                                                      "Error loading buyer image:",
+                                                      photo,
+                                                      "Full URL:",
+                                                      imageUrl
+                                                    );
+                                                    (
+                                                      e.target as HTMLImageElement
+                                                    ).src =
+                                                      "https://via.placeholder.com/150?text=Error";
+                                                  }}
+                                                />
+                                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all pointer-events-none">
+                                                  <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                </div>
+                                              </div>
+                                              {/* Nút xóa ảnh đã upload */}
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleDeletePhoto(
+                                                    photo,
+                                                    "buyer",
+                                                    index
+                                                  );
+                                                }}
+                                                className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                                title="Xóa ảnh"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </button>
+                                            </div>
+                                          );
+                                        }
+                                      )}
+                                      {/* Hiển thị placeholder cho slot trống */}
+                                      {Array.from({
+                                        length: 3 - contractPhotos.buyer.length,
+                                      }).map((_, index) => (
+                                        <div
+                                          key={`empty-${index}`}
+                                          className="w-full h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50"
+                                        >
+                                          <span className="text-xs text-gray-400">
+                                            Trống
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Preview ảnh chưa upload */}
+                                {previewFiles.buyer.length > 0 && (
+                                  <div className="mb-3">
+                                    <p className="text-xs text-green-600 mb-2 font-medium">
+                                      Ảnh đã chọn (chưa upload) (
+                                      {previewFiles.buyer.length}/3):
+                                    </p>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {previewFiles.buyer.map((file, index) => {
+                                        const previewUrl =
+                                          createPreviewUrl(file);
+                                        return (
+                                          <div
+                                            key={index}
+                                            className="relative group"
+                                          >
+                                            <div
+                                              className="cursor-pointer"
+                                              onClick={() => {
+                                                const previewUrls =
+                                                  previewFiles.buyer.map((f) =>
+                                                    createPreviewUrl(f)
+                                                  );
+                                                setPreviewImages(previewUrls);
+                                                setPreviewIndex(index);
+                                                setIsPreviewOpen(true);
+                                              }}
+                                            >
+                                              <img
+                                                src={previewUrl}
+                                                alt={`Preview ${index + 1}`}
+                                                className="w-full h-24 object-cover rounded-lg border-2 border-green-300 hover:border-green-500 transition-colors"
+                                              />
+                                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all pointer-events-none">
+                                                <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                              </div>
+                                            </div>
+                                            {/* Nút xóa preview */}
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleRemovePreviewFile(
+                                                  "buyer",
+                                                  index
+                                                );
+                                                URL.revokeObjectURL(previewUrl);
+                                              }}
+                                              className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                              title="Xóa khỏi preview"
+                                            >
+                                              <Trash2 className="w-3 h-3" />
+                                            </button>
+                                          </div>
+                                        );
+                                      })}
+                                      {/* Hiển thị placeholder cho slot trống */}
+                                      {Array.from({
+                                        length: 3 - previewFiles.buyer.length,
+                                      }).map((_, index) => (
+                                        <div
+                                          key={`empty-preview-${index}`}
+                                          className="w-full h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50"
+                                        >
+                                          <span className="text-xs text-gray-400">
+                                            Trống
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Input chọn file - chỉ hiển thị khi còn slot */}
+                                {contractPhotos.buyer.length +
+                                  previewFiles.buyer.length <
+                                  3 && (
+                                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-3">
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      multiple
+                                      onChange={(e) =>
+                                        handleFileSelect(e, "buyer")
+                                      }
+                                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+                                    />
+                                    <p className="text-xs text-gray-400 mt-1">
+                                      Còn{" "}
+                                      {3 -
+                                        (contractPhotos.buyer.length +
+                                          previewFiles.buyer.length)}{" "}
+                                      slot trống
+                                    </p>
+                                  </div>
+                                )}
+
+                                <p className="text-xs text-gray-500">
+                                  Cần đủ các mặt của hợp đồng để có thể upload.
+                                </p>
+
+                                {contractPhotos.buyer.length === 0 &&
+                                  previewFiles.buyer.length === 0 && (
+                                    <div className="mb-3 text-xs text-gray-400">
+                                      Chưa có ảnh nào được chọn
+                                    </div>
+                                  )}
+                              </div>
+                            )}
+                        </div>
+                      </div>
+
+                      {/* Nút Upload chung cho cả 2 bên */}
+                      {["CONFIRMED", "COMPLETED"].includes(
+                        selectedAppointment.status ?? ""
+                      ) &&
+                        (!contractPhotos.seller ||
+                          contractPhotos.seller.length < 3 ||
+                          !contractPhotos.buyer ||
+                          contractPhotos.buyer.length < 3) &&
+                        previewFiles.seller.length === 3 &&
+                        previewFiles.buyer.length === 3 && (
+                          <div className="mt-4">
+                            <button
+                              onClick={handleUploadBothSides}
+                              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
+                            >
+                              Upload ảnh
+                            </button>
+                          </div>
+                        )}
+
+                      {/* Ảnh hợp đồng đã ký khi hoàn thành */}
+                      {selectedAppointment.status === "COMPLETED" && (
+                        <div className="mt-6">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                            Ảnh hợp đồng đã ký
+                          </h3>
+                          {completedContractPhotos.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                              {completedContractPhotos.map((photo, index) => {
                                 const imageUrl = photo.startsWith("http")
                                   ? photo
                                   : `${api.defaults.baseURL || ""}${
@@ -2395,461 +2867,43 @@ const AppointmentManagement: React.FC = () => {
                                       className="cursor-pointer"
                                       onClick={() =>
                                         openImagePreview(
-                                          contractPhotos.seller,
+                                          completedContractPhotos,
                                           index
                                         )
                                       }
                                     >
                                       <img
                                         src={imageUrl}
-                                        alt={`Seller photo ${index + 1}`}
-                                        className="w-full h-24 object-cover rounded-lg border-2 border-orange-200 hover:border-orange-400 transition-colors"
+                                        alt={`Contract photo ${index + 1}`}
+                                        className="w-full h-40 object-cover rounded-lg border-2 border-gray-200 hover:border-blue-400 transition-colors"
                                         onError={(e) => {
                                           console.error(
-                                            "Error loading seller image:",
+                                            "Error loading contract image:",
                                             photo,
                                             "Full URL:",
                                             imageUrl
                                           );
                                           (e.target as HTMLImageElement).src =
-                                            "https://via.placeholder.com/150?text=Error";
+                                            "https://via.placeholder.com/300x200?text=Error";
                                         }}
                                       />
                                       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all pointer-events-none">
                                         <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                       </div>
                                     </div>
-                                    {/* Nút xóa ảnh */}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeletePhoto(
-                                          photo,
-                                          "seller",
-                                          index
-                                        );
-                                      }}
-                                      className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                                      title="Xóa ảnh"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
                                   </div>
                                 );
                               })}
-                              {/* Hiển thị placeholder cho slot trống */}
-                              {Array.from({
-                                length: 3 - contractPhotos.seller.length,
-                              }).map((_, index) => (
-                                <div
-                                  key={`empty-${index}`}
-                                  className="w-full h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50"
-                                >
-                                  <span className="text-xs text-gray-400">
-                                    Trống
-                                  </span>
-                                </div>
-                              ))}
                             </div>
-                          </div>
-                        )}
-
-                        {/* Preview ảnh chưa upload */}
-                        {previewFiles.seller.length > 0 && (
-                          <div className="mb-3">
-                            <p className="text-xs text-orange-600 mb-2 font-medium">
-                              Ảnh đã chọn (chưa upload) (
-                              {previewFiles.seller.length}/3):
-                            </p>
-                            <div className="grid grid-cols-3 gap-2">
-                              {previewFiles.seller.map((file, index) => {
-                                const previewUrl = createPreviewUrl(file);
-                                return (
-                                  <div key={index} className="relative group">
-                                    <div
-                                      className="cursor-pointer"
-                                      onClick={() => {
-                                        const previewUrls =
-                                          previewFiles.seller.map((f) =>
-                                            createPreviewUrl(f)
-                                          );
-                                        setPreviewImages(previewUrls);
-                                        setPreviewIndex(index);
-                                        setIsPreviewOpen(true);
-                                      }}
-                                    >
-                                      <img
-                                        src={previewUrl}
-                                        alt={`Preview ${index + 1}`}
-                                        className="w-full h-24 object-cover rounded-lg border-2 border-orange-300 hover:border-orange-500 transition-colors"
-                                      />
-                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all pointer-events-none">
-                                        <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                      </div>
-                                    </div>
-                                    {/* Nút xóa preview */}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRemovePreviewFile(
-                                          "seller",
-                                          index
-                                        );
-                                        URL.revokeObjectURL(previewUrl);
-                                      }}
-                                      className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                                      title="Xóa khỏi preview"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                );
-                              })}
-                              {/* Hiển thị placeholder cho slot trống */}
-                              {Array.from({
-                                length: 3 - previewFiles.seller.length,
-                              }).map((_, index) => (
-                                <div
-                                  key={`empty-preview-${index}`}
-                                  className="w-full h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50"
-                                >
-                                  <span className="text-xs text-gray-400">
-                                    Trống
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Input chọn file - chỉ hiển thị khi còn slot */}
-                        {contractPhotos.seller.length +
-                          previewFiles.seller.length <
-                          3 && (
-                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-3">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              onChange={(e) => handleFileSelect(e, "seller")}
-                              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
-                            />
-                            <p className="text-xs text-gray-400 mt-1">
-                              Còn{" "}
-                              {3 -
-                                (contractPhotos.seller.length +
-                                  previewFiles.seller.length)}{" "}
-                              slot trống
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Yêu cầu đủ 3 ảnh mỗi bên mới cho phép upload */}
-                        <p className="text-xs text-gray-500">
-                          Cần đủ các mặt của hợp đồng để có thể upload.
-                        </p>
-
-                        {contractPhotos.seller.length === 0 &&
-                          previewFiles.seller.length === 0 && (
-                            <div className="mb-3 text-xs text-gray-400">
-                              Chưa có ảnh nào được chọn
+                          ) : (
+                            <div className="text-sm text-gray-500">
+                              Không có ảnh hợp đồng.
                             </div>
                           )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Bên Mua */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-green-700 mb-3">
-                      🟢 Bên Mua
-                    </h3>
-                    <div className="bg-green-50 rounded-lg p-4 mb-4">
-                      <p className="text-gray-700">
-                        <span className="font-medium">Tên:</span>{" "}
-                        {selectedAppointment.buyer?.name || "N/A"}
-                      </p>
-                      <p className="text-gray-700 mt-2">
-                        <span className="font-medium">Email:</span>{" "}
-                        {selectedAppointment.buyer?.email || "N/A"}
-                      </p>
-                      <p className="text-gray-700 mt-2">
-                        <span className="font-medium">Số điện thoại:</span>{" "}
-                        {selectedAppointment.buyer?.phone || "N/A"}
-                      </p>
-                    </div>
-
-                    {/* Upload ảnh cho bên mua */}
-                    {["CONFIRMED", "COMPLETED"].includes(
-                      selectedAppointment.status ?? ""
-                    ) &&
-                      (!contractPhotos.seller ||
-                        contractPhotos.seller.length < 3 ||
-                        !contractPhotos.buyer ||
-                        contractPhotos.buyer.length < 3) && (
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-medium text-gray-700">
-                          Upload ảnh hợp đồng (Bên Mua)
-                        </h4>
-                        {/* Hiển thị ảnh đã upload */}
-                        {contractPhotos.buyer.length > 0 && (
-                          <div className="mb-3">
-                            <p className="text-xs text-gray-500 mb-2">
-                              Ảnh đã upload ({contractPhotos.buyer.length}/3):
-                            </p>
-                            <div className="grid grid-cols-3 gap-2">
-                              {contractPhotos.buyer.map((photo, index) => {
-                                const imageUrl = photo.startsWith("http")
-                                  ? photo
-                                  : `${api.defaults.baseURL || ""}${
-                                      photo.startsWith("/")
-                                        ? photo
-                                        : "/" + photo
-                                    }`;
-                                return (
-                                  <div key={index} className="relative group">
-                                    <div
-                                      className="cursor-pointer"
-                                      onClick={() =>
-                                        openImagePreview(
-                                          contractPhotos.buyer,
-                                          index
-                                        )
-                                      }
-                                    >
-                                      <img
-                                        src={imageUrl}
-                                        alt={`Buyer photo ${index + 1}`}
-                                        className="w-full h-24 object-cover rounded-lg border-2 border-green-200 hover:border-green-400 transition-colors"
-                                        onError={(e) => {
-                                          console.error(
-                                            "Error loading buyer image:",
-                                            photo,
-                                            "Full URL:",
-                                            imageUrl
-                                          );
-                                          (e.target as HTMLImageElement).src =
-                                            "https://via.placeholder.com/150?text=Error";
-                                        }}
-                                      />
-                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all pointer-events-none">
-                                        <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                      </div>
-                                    </div>
-                                    {/* Nút xóa ảnh đã upload */}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeletePhoto(
-                                          photo,
-                                          "buyer",
-                                          index
-                                        );
-                                      }}
-                                      className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                                      title="Xóa ảnh"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                );
-                              })}
-                              {/* Hiển thị placeholder cho slot trống */}
-                              {Array.from({
-                                length: 3 - contractPhotos.buyer.length,
-                              }).map((_, index) => (
-                                <div
-                                  key={`empty-${index}`}
-                                  className="w-full h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50"
-                                >
-                                  <span className="text-xs text-gray-400">
-                                    Trống
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Preview ảnh chưa upload */}
-                        {previewFiles.buyer.length > 0 && (
-                          <div className="mb-3">
-                            <p className="text-xs text-green-600 mb-2 font-medium">
-                              Ảnh đã chọn (chưa upload) (
-                              {previewFiles.buyer.length}/3):
-                            </p>
-                            <div className="grid grid-cols-3 gap-2">
-                              {previewFiles.buyer.map((file, index) => {
-                                const previewUrl = createPreviewUrl(file);
-                                return (
-                                  <div key={index} className="relative group">
-                                    <div
-                                      className="cursor-pointer"
-                                      onClick={() => {
-                                        const previewUrls =
-                                          previewFiles.buyer.map((f) =>
-                                            createPreviewUrl(f)
-                                          );
-                                        setPreviewImages(previewUrls);
-                                        setPreviewIndex(index);
-                                        setIsPreviewOpen(true);
-                                      }}
-                                    >
-                                      <img
-                                        src={previewUrl}
-                                        alt={`Preview ${index + 1}`}
-                                        className="w-full h-24 object-cover rounded-lg border-2 border-green-300 hover:border-green-500 transition-colors"
-                                      />
-                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all pointer-events-none">
-                                        <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                      </div>
-                                    </div>
-                                    {/* Nút xóa preview */}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRemovePreviewFile("buyer", index);
-                                        URL.revokeObjectURL(previewUrl);
-                                      }}
-                                      className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                                      title="Xóa khỏi preview"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                );
-                              })}
-                              {/* Hiển thị placeholder cho slot trống */}
-                              {Array.from({
-                                length: 3 - previewFiles.buyer.length,
-                              }).map((_, index) => (
-                                <div
-                                  key={`empty-preview-${index}`}
-                                  className="w-full h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50"
-                                >
-                                  <span className="text-xs text-gray-400">
-                                    Trống
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Input chọn file - chỉ hiển thị khi còn slot */}
-                        {contractPhotos.buyer.length +
-                          previewFiles.buyer.length <
-                          3 && (
-                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-3">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              onChange={(e) => handleFileSelect(e, "buyer")}
-                              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-                            />
-                            <p className="text-xs text-gray-400 mt-1">
-                              Còn{" "}
-                              {3 -
-                                (contractPhotos.buyer.length +
-                                  previewFiles.buyer.length)}{" "}
-                              slot trống
-                            </p>
-                          </div>
-                        )}
-
-                        <p className="text-xs text-gray-500">
-                          Cần đủ các mặt của hợp đồng để có thể upload.
-                        </p>
-
-                        {contractPhotos.buyer.length === 0 &&
-                          previewFiles.buyer.length === 0 && (
-                            <div className="mb-3 text-xs text-gray-400">
-                              Chưa có ảnh nào được chọn
-                            </div>
-                          )}
-                      </div>
-                    )}
-                  </div>
-                    </div>
-
-                    {/* Nút Upload chung cho cả 2 bên */}
-                    {["CONFIRMED", "COMPLETED"].includes(
-                      selectedAppointment.status ?? ""
-                    ) &&
-                      (!contractPhotos.seller ||
-                        contractPhotos.seller.length < 3 ||
-                        !contractPhotos.buyer ||
-                        contractPhotos.buyer.length < 3) &&
-                      previewFiles.seller.length === 3 &&
-                      previewFiles.buyer.length === 3 && (
-                        <div className="mt-4">
-                          <button
-                            onClick={handleUploadBothSides}
-                            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
-                          >
-                            Upload ảnh
-                          </button>
                         </div>
                       )}
-
-                    {/* Ảnh hợp đồng đã ký khi hoàn thành */}
-                    {selectedAppointment.status === "COMPLETED" && (
-                      <div className="mt-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                          Ảnh hợp đồng đã ký
-                        </h3>
-                        {completedContractPhotos.length > 0 ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                            {completedContractPhotos.map((photo, index) => {
-                              const imageUrl = photo.startsWith("http")
-                                ? photo
-                                : `${api.defaults.baseURL || ""}${
-                                    photo.startsWith("/") ? photo : "/" + photo
-                                  }`;
-                              return (
-                                <div key={index} className="relative group">
-                                  <div
-                                    className="cursor-pointer"
-                                    onClick={() =>
-                                      openImagePreview(
-                                        completedContractPhotos,
-                                        index
-                                      )
-                                    }
-                                  >
-                                    <img
-                                      src={imageUrl}
-                                      alt={`Contract photo ${index + 1}`}
-                                      className="w-full h-40 object-cover rounded-lg border-2 border-gray-200 hover:border-blue-400 transition-colors"
-                                      onError={(e) => {
-                                        console.error(
-                                          "Error loading contract image:",
-                                          photo,
-                                          "Full URL:",
-                                          imageUrl
-                                        );
-                                        (e.target as HTMLImageElement).src =
-                                          "https://via.placeholder.com/300x200?text=Error";
-                                      }}
-                                    />
-                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all pointer-events-none">
-                                      <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500">
-                            Không có ảnh hợp đồng.
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
+                    </>
+                  )}
 
                 {["DELIVERY", "VEHICLE_HANDOVER"].includes(
                   selectedAppointment.type || ""
@@ -2890,27 +2944,30 @@ const AppointmentManagement: React.FC = () => {
                         <p className="text-sm font-medium text-gray-700 mb-2">
                           Các khung giờ đã đề xuất
                         </p>
-                      {selectedAppointment.proposedSlots &&
-                      selectedAppointment.proposedSlots.length > 0 ? (
+                        {selectedAppointment.proposedSlots &&
+                        selectedAppointment.proposedSlots.length > 0 ? (
                           <div className="space-y-2">
-                            {selectedAppointment.proposedSlots.map((slot, idx) => (
-                              <div
-                                key={`${slot}-${idx}`}
-                                className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2 text-sm"
-                              >
-                                <span>{formatDate(slot)}</span>
-                                {selectedAppointment.selectedSlot === slot && (
-                                  <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                                    Đã chọn
-                                  </span>
-                                )}
-                              </div>
-                            ))}
+                            {selectedAppointment.proposedSlots.map(
+                              (slot, idx) => (
+                                <div
+                                  key={`${slot}-${idx}`}
+                                  className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2 text-sm"
+                                >
+                                  <span>{formatDate(slot)}</span>
+                                  {selectedAppointment.selectedSlot ===
+                                    slot && (
+                                    <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                                      Đã chọn
+                                    </span>
+                                  )}
+                                </div>
+                              )
+                            )}
                           </div>
                         ) : (
                           <p className="text-sm text-gray-500">
-                            Chưa có khung giờ nào được gửi. Nhấn “Gửi lịch bàn giao” để
-                            bắt đầu.
+                            Chưa có khung giờ nào được gửi. Nhấn “Gửi lịch bàn
+                            giao” để bắt đầu.
                           </p>
                         )}
                       </div>
@@ -2923,16 +2980,19 @@ const AppointmentManagement: React.FC = () => {
                             Bằng chứng bàn giao
                           </h4>
                           <p className="text-sm text-gray-500">
-                            Ảnh/biên bản bàn giao dùng để kích hoạt payout cho người bán.
+                            Ảnh/biên bản bàn giao dùng để kích hoạt payout cho
+                            người bán.
                           </p>
                         </div>
                         <button
                           onClick={handleUploadHandoverProofs}
                           disabled={
-                            isUploadingHandoverProofs || handoverProofFiles.length === 0
+                            isUploadingHandoverProofs ||
+                            handoverProofFiles.length === 0
                           }
                           className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-                            isUploadingHandoverProofs || handoverProofFiles.length === 0
+                            isUploadingHandoverProofs ||
+                            handoverProofFiles.length === 0
                               ? "bg-gray-200 text-gray-500 cursor-not-allowed"
                               : "bg-indigo-600 text-white hover:bg-indigo-700"
                           }`}
@@ -2955,7 +3015,10 @@ const AppointmentManagement: React.FC = () => {
                                 }`
                               : "";
                             return (
-                              <div key={`handover-proof-${index}`} className="border border-gray-100 rounded-lg overflow-hidden bg-white shadow-sm">
+                              <div
+                                key={`handover-proof-${index}`}
+                                className="border border-gray-100 rounded-lg overflow-hidden bg-white shadow-sm"
+                              >
                                 <div
                                   className="relative h-40 bg-gray-100 cursor-pointer group"
                                   onClick={() => {
@@ -2967,7 +3030,9 @@ const AppointmentManagement: React.FC = () => {
                                         url.startsWith("http")
                                           ? url
                                           : `${api.defaults.baseURL || ""}${
-                                              url.startsWith("/") ? url : "/" + url
+                                              url.startsWith("/")
+                                                ? url
+                                                : "/" + url
                                             }`
                                       );
                                     if (!gallery.length) return;
@@ -3009,8 +3074,8 @@ const AppointmentManagement: React.FC = () => {
                         </div>
                       ) : (
                         <p className="text-sm text-gray-500">
-                          Chưa có bằng chứng bàn giao nào. Upload ảnh sau khi bàn giao để
-                          hệ thống tự động payout cho người bán.
+                          Chưa có bằng chứng bàn giao nào. Upload ảnh sau khi
+                          bàn giao để hệ thống tự động payout cho người bán.
                         </p>
                       )}
 
@@ -3028,8 +3093,8 @@ const AppointmentManagement: React.FC = () => {
                                   <div
                                     className="cursor-pointer"
                                     onClick={() => {
-                                      const previews = handoverProofFiles.map((f) =>
-                                        createPreviewUrl(f)
+                                      const previews = handoverProofFiles.map(
+                                        (f) => createPreviewUrl(f)
                                       );
                                       setPreviewImages(previews);
                                       setPreviewIndex(index);
@@ -3071,8 +3136,8 @@ const AppointmentManagement: React.FC = () => {
                           className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          Tối đa {MAX_HANDOVER_PROOF_FILES} ảnh bàn giao (cavet, chìa khoá,
-                          tình trạng xe...).
+                          Tối đa {MAX_HANDOVER_PROOF_FILES} ảnh bàn giao (cavet,
+                          chìa khoá, tình trạng xe...).
                         </p>
                       </div>
 
@@ -3186,8 +3251,7 @@ const AppointmentManagement: React.FC = () => {
                                 </div>
                                 <div className="p-3 border-t border-gray-100">
                                   <p className="text-sm text-gray-800">
-                                    {proof?.description ||
-                                      "Không có ghi chú"}
+                                    {proof?.description || "Không có ghi chú"}
                                   </p>
                                   {proof?.uploadedAt && (
                                     <p className="text-xs text-gray-500 mt-1">
@@ -3299,21 +3363,21 @@ const AppointmentManagement: React.FC = () => {
                 {selectedAppointment.type !== "CONTRACT_NOTARIZATION" &&
                   selectedAppointment.type !== "VEHICLE_HANDOVER" &&
                   selectedAppointment.status === "CONFIRMED" && (
-                  <div className="mt-6 flex items-center justify-center gap-3">
-                    <button
-                      onClick={handleHoldVehicle}
-                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-                    >
-                      Giữ xe
-                    </button>
-                    <button
-                      onClick={handleBuyNow}
-                      className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
-                    >
-                      Mua ngay
-                    </button>
-                  </div>
-                )}
+                    <div className="mt-6 flex items-center justify-center gap-3">
+                      <button
+                        onClick={handleHoldVehicle}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                      >
+                        Giữ xe
+                      </button>
+                      <button
+                        onClick={handleBuyNow}
+                        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+                      >
+                        Mua ngay
+                      </button>
+                    </div>
+                  )}
               </div>
             </div>
           </div>
