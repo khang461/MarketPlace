@@ -869,6 +869,20 @@ const AppointmentManagement: React.FC = () => {
           buyer: buyerUrls.length === 3 ? buyerUrls : prev.buyer,
         }));
 
+        setCompletedContractPhotos(photoUrls);
+
+        setSelectedAppointment((prev) =>
+          prev
+            ? {
+                ...prev,
+                contractPhotos: [
+                  ...(prev.contractPhotos || []),
+                  ...uploadedPhotos,
+                ],
+              }
+            : prev
+        );
+
         // Xóa preview sau khi upload
         setPreviewFiles({ seller: [], buyer: [] });
 
@@ -1827,6 +1841,19 @@ const AppointmentManagement: React.FC = () => {
                           Xem chi tiết
                         </button>
 
+                        {appointment.status === "COMPLETED" &&
+                          appointment.type !== "VEHICLE_INSPECTION" &&
+                          !(appointment.contractPhotos &&
+                            appointment.contractPhotos.length >= 6) && (
+                          <button
+                            onClick={() => openModal(appointment)}
+                            className="text-purple-600 hover:text-purple-900 flex items-center"
+                          >
+                            <FileText className="w-4 h-4 mr-1" />
+                            Ký hợp đồng
+                          </button>
+                        )}
+
                         {appointment.status === "CONFIRMED" && (
                           <div className="relative dropdown-menu-container">
                             <button
@@ -2026,7 +2053,13 @@ const AppointmentManagement: React.FC = () => {
                     </div>
 
                     {/* Upload ảnh cho bên bán */}
-                    {selectedAppointment.status === "CONFIRMED" && (
+                    {["CONFIRMED", "COMPLETED"].includes(
+                      selectedAppointment.status ?? ""
+                    ) &&
+                      (!contractPhotos.seller ||
+                        contractPhotos.seller.length < 3 ||
+                        !contractPhotos.buyer ||
+                        contractPhotos.buyer.length < 3) && (
                       <div className="space-y-3">
                         <h4 className="text-sm font-medium text-gray-700">
                           Upload ảnh hợp đồng (Bên Bán)
@@ -2237,7 +2270,13 @@ const AppointmentManagement: React.FC = () => {
                     </div>
 
                     {/* Upload ảnh cho bên mua */}
-                    {selectedAppointment.status === "CONFIRMED" && (
+                    {["CONFIRMED", "COMPLETED"].includes(
+                      selectedAppointment.status ?? ""
+                    ) &&
+                      (!contractPhotos.seller ||
+                        contractPhotos.seller.length < 3 ||
+                        !contractPhotos.buyer ||
+                        contractPhotos.buyer.length < 3) && (
                       <div className="space-y-3">
                         <h4 className="text-sm font-medium text-gray-700">
                           Upload ảnh hợp đồng (Bên Mua)
@@ -2425,7 +2464,13 @@ const AppointmentManagement: React.FC = () => {
                 </div>
 
                 {/* Nút Upload chung cho cả 2 bên */}
-                {selectedAppointment.status === "CONFIRMED" &&
+                {["CONFIRMED", "COMPLETED"].includes(
+                  selectedAppointment.status ?? ""
+                ) &&
+                  (!contractPhotos.seller ||
+                    contractPhotos.seller.length < 3 ||
+                    !contractPhotos.buyer ||
+                    contractPhotos.buyer.length < 3) &&
                   previewFiles.seller.length === 3 &&
                   previewFiles.buyer.length === 3 && (
                     <div className="mt-4">
