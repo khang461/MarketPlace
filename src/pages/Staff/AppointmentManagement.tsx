@@ -2314,13 +2314,16 @@ const AppointmentManagement: React.FC = () => {
                       {getStatusBadge(appointment.status)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-4">
                         <button
                           onClick={() => openModal(appointment)}
-                          className="text-blue-600 hover:text-blue-900 flex items-center"
+                          className="text-blue-600 hover:text-blue-900 relative group"
+                          title="Xem chi tiết"
                         >
-                          <Eye className="w-4 h-4 mr-1" />
-                          Xem chi tiết
+                          <Eye className="w-4 h-4" />
+                          <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                            Xem chi tiết
+                          </span>
                         </button>
 
                         {appointment.status === "COMPLETED" &&
@@ -2331,10 +2334,13 @@ const AppointmentManagement: React.FC = () => {
                           ) && (
                             <button
                               onClick={() => openModal(appointment)}
-                              className="text-purple-600 hover:text-purple-900 flex items-center"
+                              className="text-purple-600 hover:text-purple-900 relative group"
+                              title="Ký hợp đồng"
                             >
-                              <FileText className="w-4 h-4 mr-1" />
-                              Ký hợp đồng
+                              <FileText className="w-4 h-4" />
+                              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                Ký hợp đồng
+                              </span>
                             </button>
                           )}
 
