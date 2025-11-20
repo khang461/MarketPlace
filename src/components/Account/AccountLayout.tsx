@@ -46,7 +46,7 @@ const AccountLayout: React.FC<AccountLayoutProps> = ({
           <p className="text-gray-600 mb-7">
             Quản lý thông tin cá nhân và hoạt động
           </p>
-          <div className="lg:w-70">
+          <div className="w-full lg:w-64">
             <div className="bg-white rounded-lg shadow-md p-4">
               <nav className="space-y-1">
                 {tabs.map((tab) => {

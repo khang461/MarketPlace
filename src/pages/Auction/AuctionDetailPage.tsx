@@ -29,29 +29,19 @@ function safeText(val: unknown): string {
   if (val == null) return "";
   if (typeof val === "string" || typeof val === "number") return String(val);
   if (typeof val === "object") {
-    const o = val as Record<string, unknown>;
-    return (
-      (o.fullName as string) ||
-      (o.name as string) ||
-      (o.title as string) ||
-      (o._id as string) ||
-      (o.id as string) ||
-      (o.userId as string) ||
-      JSON.stringify(o)
-    );
+    const o = val as Record<string, any>;
+    const v =
+      o.fullName || o.name || o.title || o._id || o.id || o.userId || "";
+    return String(v) || JSON.stringify(o);
   }
-  try {
-    return String(val);
-  } catch {
-    return "";
-  }
+
+  return "";
 }
 
 const fmtVND = (n?: number) =>
   typeof n === "number" && !Number.isNaN(n)
     ? n.toLocaleString("vi-VN") + "₫"
     : "0₫";
-
 const StatusBadge = ({
   status,
 }: {
@@ -237,12 +227,43 @@ export default function AuctionDetailPage() {
         const newBid = data.bid || data.newBid;
         if (!newBid) return prev;
 
-        // Add new bid to the list
-        const updatedBids = [...(prev.bids || []), newBid];
+        // Merge newBid into existing bids while avoiding duplicates.
+        const mergeBids = (existing: any[] | undefined, bid: any) => {
+          const arr = Array.isArray(existing) ? existing.slice() : [];
 
-        // Update current price
+          // Helper to extract a stable key for a bid: prefer _id, otherwise userId+price
+          const bidKey = (x: any) => {
+            if (!x) return Math.random().toString();
+            if (x._id) return `id:${x._id}`;
+            const uid =
+              extractBidUserId(x) ||
+              (x.userId && typeof x.userId === "string"
+                ? x.userId
+                : undefined) ||
+              (x.user && (x.user._id || x.user.id));
+            if (uid) return `u:${uid}|p:${Number(x.price || 0)}`;
+            return `temp:${String(x.price || 0)}|${String(x.createdAt || "")}`;
+          };
+
+          const map = new Map<string, any>();
+
+          // add existing
+          for (const it of arr) {
+            map.set(bidKey(it), it);
+          }
+
+          // put/replace with incoming bid (prefer incoming when same key)
+          map.set(bidKey(bid), bid);
+
+          // return array of values
+          return Array.from(map.values());
+        };
+
+        const updatedBids = mergeBids(prev.bids, newBid);
+
+        // Update current price conservatively
         const newCurrentPrice = Math.max(
-          newBid.price,
+          newBid.price || 0,
           prev.currentPrice || prev.startingPrice || 0
         );
 
@@ -253,7 +274,6 @@ export default function AuctionDetailPage() {
           // Update other fields if provided
           ...(data.auction && {
             status: data.auction.status || prev.status,
-            winnerId: data.auction.winnerId || prev.winnerId,
           }),
         };
       });
@@ -262,14 +282,16 @@ export default function AuctionDetailPage() {
     // Handler for auction ended event
     const handleAuctionEnded = (data: any) => {
       console.log("🏁 Auction ended:", data);
-      setAuction((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          status: "ended",
-          winnerId: data.winnerId || data.auction?.winnerId || prev.winnerId,
-        };
-      });
+      // Try to use provided auction payload if present (some servers send full auction),
+      // otherwise do a full reload from the API to ensure we have the complete bid history.
+      if (data?.auction) {
+        setAuction((prev) => ({ ...(prev || {}), ...(data.auction || {}), status: "ended" } as any));
+      } else {
+        // mark ended for immediate UI feedback then reload full data
+        setAuction((prev) => (prev ? { ...prev, status: "ended" } : prev));
+        // fetch the canonical auction payload to get full bids
+        load();
+      }
     };
 
     // Handler for auction closed
@@ -345,8 +367,24 @@ export default function AuctionDetailPage() {
   const isCancelled =
     uiStatus === "CANCELLED" || auction?.status === "cancelled";
 
+  const isCurrentlyTop = (() => {
+    const tb = topBid(auction);
+    if (!tb || !me) return false;
+    const uid = extractBidUserId(tb);
+    return !!uid && String(uid) === String(me);
+  })();
+
+  // User may only bid when auction is running, in window, not seller, not current top,
+  // and has a confirmed deposit (either recorded on BE or user just confirmed deposit flow).
+  const hasDepositConfirmed = !!confirmedDeposit || hasDeposit === true;
   const canBid =
-    !isEnded && !isCancelled && inWindow && uiStatus === "RUNNING" && !isSeller;
+    !isEnded &&
+    !isCancelled &&
+    inWindow &&
+    uiStatus === "RUNNING" &&
+    !isSeller &&
+    !isCurrentlyTop &&
+    hasDepositConfirmed;
 
   const currentPrice = useMemo(() => {
     if (!auction) return 0;
@@ -402,30 +440,43 @@ export default function AuctionDetailPage() {
     return !!winnerUserId && String(winnerUserId) === String(me);
   }, [winnerBid, me]);
 
+  // Is current user the top bidder right now (for ongoing auctions)
+  const isTopBidder = useMemo(() => {
+    const tb = topBid(auction);
+    if (!tb || !me) return false;
+    const uid = extractBidUserId(tb);
+    return !!uid && String(uid) === String(me);
+  }, [auction, me]);
+
   const onAfterBid = (b: Bid) => {
-    setAuction((prev) =>
-      prev
-        ? {
-            ...prev,
-            currentPrice: Math.max(b.price, prev.currentPrice || 0),
-            bids: [b, ...(prev.bids || [])],
-          }
-        : prev
-    );
+    setAuction((prev) => {
+      if (!prev) return prev;
+      const uid = extractBidUserId(b);
+      const prevBids = Array.isArray(prev.bids) ? prev.bids.slice() : [];
+
+      if (uid) {
+        // If there's already a bid from this user, replace it (optimistic update merge).
+        const idx = prevBids.findIndex((x) => extractBidUserId(x) === uid);
+        if (idx >= 0) {
+          prevBids[idx] = b;
+        } else {
+          prevBids.unshift(b);
+        }
+      } else {
+        // No stable uid available; fall back to prepending as before
+        prevBids.unshift(b);
+      }
+
+      return {
+        ...prev,
+        currentPrice: Math.max(b.price, prev.currentPrice || 0),
+        bids: prevBids,
+      };
+    });
   };
 
-  /** ====== xử lý lịch sử đấu giá top 10 giá cao nhất ====== */
-  const topBids = useMemo(() => {
-    if (!auction?.bids?.length) return [];
-    // sắp xếp theo giá cao → thấp, lấy 10 người đầu
-    const byPrice = [...auction.bids].sort((a, b) => b.price - a.price);
-    return byPrice.slice(0, 10);
-  }, [auction]);
-
-  const currentTopUserId = useMemo(() => {
-    if (!topBids.length) return null;
-    return extractBidUserId(topBids[0]);
-  }, [topBids]);
+  /** ====== Auction history helper ====== */
+  // AuctionHistory now handles selecting top-5 during RUNNING and full list when ENDED
 
   /** ====== Deposit amount & confirmation flow ====== */
   const depositAmount = useMemo(() => {
@@ -626,11 +677,7 @@ export default function AuctionDetailPage() {
         <div className="rounded-2xl border bg-white shadow-sm p-4">
           <h3 className="font-semibold mb-3">Lịch sử đấu giá</h3>
           {auction.bids?.length ? (
-            <AuctionHistory
-              bids={topBids as any}
-              topUserId={currentTopUserId || undefined}
-              meId={me}
-            />
+            <AuctionHistory bids={auction.bids as any} meId={me} uiStatus={uiStatus} pageSize={20} />
           ) : (
             <div className="rounded-lg border border-dashed p-6 text-center text-gray-500">
               Chưa có lượt đấu giá nào.
@@ -689,7 +736,7 @@ export default function AuctionDetailPage() {
         </div>
 
         {/* Cancellation Reason */}
-        {isCancelled && auction.cancellationReason && (
+        {isCancelled && (auction as any).cancellationReason && (
           <div className="rounded-2xl border border-red-200 bg-red-50 shadow-sm p-4">
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0 w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
@@ -712,7 +759,7 @@ export default function AuctionDetailPage() {
                   Lý do hủy phiên đấu giá
                 </h3>
                 <p className="text-sm text-red-800">
-                  {auction.cancellationReason}
+                  {(auction as any).cancellationReason}
                 </p>
               </div>
             </div>
@@ -785,7 +832,7 @@ export default function AuctionDetailPage() {
               )}
 
               {/* Sau khi user đồng ý hoặc đã có cọc: hiển thị DepositButton gốc */}
-              {(confirmedDeposit || hasDeposit) && (
+              {(confirmedDeposit || hasDeposit) && !isTopBidder && (
                 <div className="rounded-lg border p-3 mt-2">
                   <div className="text-sm mb-2">
                     Đang xử lý đặt cọc {fmtVND(depositAmount)}…
@@ -814,13 +861,16 @@ export default function AuctionDetailPage() {
                   auction={auction}
                   isSeller={isSeller}
                   refreshKey={depVersion}
-                  disabledReason={
-                    !canBid
-                      ? uiStatus === "PENDING"
-                        ? "Phiên chưa bắt đầu"
-                        : "Không thể đặt giá"
-                      : undefined
-                  }
+                  disabledReason={(() => {
+                    if (!canBid) {
+                      if (uiStatus === "PENDING") return "Phiên chưa bắt đầu";
+                      if (isTopBidder) return "Bạn đang là người dẫn giá — không thể đặt giá liên tiếp";
+                      // If auction is running but user hasn't deposited yet
+                      if (uiStatus === "RUNNING" && !(confirmedDeposit || hasDeposit === true)) return "Vui lòng đặt cọc để tham gia phiên đấu giá";
+                      return "Không thể đặt giá";
+                    }
+                    return undefined;
+                  })()}
                   onAfterBid={onAfterBid}
                 />
               )}
@@ -993,15 +1043,24 @@ function ConfirmDepositModal({
             </p>
             <ul className="mt-2 text-xs text-gray-600 list-disc list-inside space-y-1">
               <li>
-                Nếu bạn <b>thắng đấu giá nhưng không tạo lịch hẹn trong 24h</b>,
-                hệ thống sẽ xử lý:
+                Nếu bạn <b>thắng đấu giá nhưng không tạo lịch hẹn trong 24h</b>
+                hoặc{" "}
+                <b>
+                  đã đi xem xe, xe đúng mô tả nhưng bạn quyết định không mua
+                </b>
+                , hệ thống sẽ xử lý:
               </li>
               <li className="ml-4">
-                Khấu trừ <b>50% tiền cọc</b> (30% chuyển cho người bán, 20% cho
-                hệ thống), 50% còn lại được hoàn về ví của bạn.
+                Khấu trừ <b>100% tiền cọc</b>.
               </li>
+             
               <li className="ml-4">
                 Tài khoản của bạn có thể bị <b>tạm khóa trong 3 ngày</b>.
+              </li>
+               <li className="ml-4">
+                Trường hợp xe thực tế <b>không đúng với mô tả</b>, bạn sẽ được
+                hoàn lại
+                <b> 100% tiền cọc</b>.
               </li>
             </ul>
             <p className="mt-2 text-xs text-gray-600">
@@ -1015,10 +1074,7 @@ function ConfirmDepositModal({
                 onChange={(e) => setAcceptedRules(e.target.checked)}
                 className="mt-[2px] h-4 w-4 rounded border-gray-300"
               />
-              <label
-                htmlFor="deposit-rules"
-                className="text-xs text-gray-700"
-              >
+              <label htmlFor="deposit-rules" className="text-xs text-gray-700">
                 Tôi đã đọc và đồng ý với điều khoản đặt cọc &amp; quy tắc xử lý
                 vi phạm (bao gồm việc khấu trừ tiền cọc và tạm khóa tài khoản
                 trong trường hợp vi phạm).
