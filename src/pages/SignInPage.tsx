@@ -10,7 +10,7 @@ const SignInPage: React.FC = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState("");           // dùng để hiển thị error trên form
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -67,7 +67,6 @@ const SignInPage: React.FC = () => {
 
       // Lưu user ID (backend trả về user._id)
       const userId = response.user?._id || response._id || response.id;
-
       if (!userId) {
         throw new Error("User ID not found in response");
       }
@@ -79,7 +78,6 @@ const SignInPage: React.FC = () => {
       if (response.refreshToken) {
         localStorage.setItem("refreshToken", response.refreshToken);
       }
-
       localStorage.setItem("userId", userId);
 
       // Login user với dữ liệu từ response
@@ -103,37 +101,65 @@ const SignInPage: React.FC = () => {
 
       // Redirect dựa trên role
       let redirectPath = "/";
-      
       if (userRole.toLowerCase() === "staff") {
         redirectPath = "/staff";
       }
 
       setTimeout(() => navigate(redirectPath), 1500);
-    } catch (error: unknown) {
-      console.error("Login error:", error);
+    } catch (err: unknown) {
+      console.error("Login error:", err);
 
       let errorMessage = "Đăng nhập thất bại. Vui lòng thử lại!";
 
-      if (error && typeof error === "object" && "response" in error) {
-        const axiosError = error as {
+      if (err && typeof err === "object" && "response" in err) {
+        const axiosError = err as {
           response?: {
             status?: number;
             data?: {
               error?: string;
               message?: string;
+              code?: string;
             };
           };
         };
 
-        // Lấy error message từ backend
-        if (axiosError.response?.data?.error) {
-          errorMessage = axiosError.response.data.error;
-        } else if (axiosError.response?.data?.message) {
-          errorMessage = axiosError.response.data.message;
-        } else if (axiosError.response?.status === 400) {
+        const status = axiosError.response?.status;
+        const data = axiosError.response?.data;
+
+        // 🔥 TRƯỜNG HỢP TÀI KHOẢN BỊ KHÓA
+        if (status === 403 && data?.code === "ACCOUNT_DISABLED") {
+          errorMessage =
+            data.message ||
+            data.error ||
+            "Tài khoản của bạn đã bị khoá. Vui lòng liên hệ quản trị viên hoặc bộ phận hỗ trợ.";
+
+          // hiển thị trên form
+          setError(errorMessage);
+          setPassword("");
+
+          // popup cho rõ ràng
+          Swal.fire({
+            icon: "error",
+            title: "Tài khoản bị khoá",
+            text: errorMessage,
+            confirmButtonColor: "#2563eb",
+          });
+
+          setIsLoading(false);
+          return;
+        }
+
+        // Các lỗi khác
+        if (data?.error) {
+          errorMessage = data.error;
+        } else if (data?.message) {
+          errorMessage = data.message;
+        } else if (status === 400) {
           errorMessage = "Email hoặc mật khẩu không đúng";
         }
       }
+
+      setError(errorMessage);
 
       Swal.fire({
         icon: "error",
@@ -165,7 +191,7 @@ const SignInPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2 text-red-700">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2 text-red-700 mb-2">
                 <AlertCircle className="w-5 h-5 flex-shrink-0" />
                 <span className="text-sm">{error}</span>
               </div>
