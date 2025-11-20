@@ -85,6 +85,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/staff/users"
+            element={
+              <ProtectedRoute requiredRole="staff">
+                <StaffUsersPage />
+              </ProtectedRoute>
+            }
+          />  
 
           {/* ---- App Shell có Header/Footer ---- */}
           <Route
