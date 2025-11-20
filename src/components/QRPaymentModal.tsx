@@ -6,7 +6,7 @@ interface QRPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   qrCode: string; // base64 image hoặc URL
-  paymentUrl?: string;
+paymentUrl?: string
   amount: number;
   title: string;
   description?: string;
