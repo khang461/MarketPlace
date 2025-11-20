@@ -28,7 +28,13 @@ export interface Appointment {
   dealId?: string;
   scheduledDate: string;
   location: string;
-  status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "RESCHEDULED";
+  status:
+    | "PENDING"
+    | "CONFIRMED"
+    | "COMPLETED"
+    | "CANCELLED"
+    | "RESCHEDULED"
+    | "AWAITING_REMAINING_PAYMENT";
   type:
     | "VEHICLE_INSPECTION"
     | "CONTRACT_SIGNING"
@@ -213,6 +219,7 @@ const AppointmentManagement: React.FC = () => {
     title: string;
     description?: string;
     orderId?: string;
+    appointmentId?: string;
   } | null>(null);
   const [staffLoadingMap, setStaffLoadingMap] = useState<
     Record<string, boolean>
@@ -442,6 +449,11 @@ const AppointmentManagement: React.FC = () => {
         color: "bg-red-100 text-red-800",
         icon: XCircle,
         label: "Đã hủy",
+      },
+      AWAITING_REMAINING_PAYMENT: {
+        color: "bg-blue-100 text-blue-800",
+        icon: Clock,
+        label: "Chờ thanh toán phần còn lại",
       },
     };
 
@@ -1300,6 +1312,13 @@ const AppointmentManagement: React.FC = () => {
       console.log("Deposit response:", response.data);
 
       if (response.data.paymentUrl && response.data.qrCode) {
+        // Cập nhật status thành AWAITING_REMAINING_PAYMENT khi đặt cọc thành công
+        applyUpdatedAppointment({
+          id: appointmentId,
+          appointmentId,
+          status: "AWAITING_REMAINING_PAYMENT",
+        });
+
         setQrData({
           qrCode: response.data.qrCode,
           paymentUrl: response.data.paymentUrl,
@@ -1307,6 +1326,7 @@ const AppointmentManagement: React.FC = () => {
           title: "Đặt cọc giữ xe",
           description: `Đặt cọc 10% cho appointment ${appointmentId}`,
           orderId: response.data.orderId,
+          appointmentId: appointmentId,
         });
         console.log("QR Data set for hold vehicle:", {
           qrCode: response.data.qrCode,
@@ -1314,6 +1334,13 @@ const AppointmentManagement: React.FC = () => {
         });
         setQrModalOpen(true);
       } else {
+        // Nếu không có QR code, vẫn cập nhật status
+        applyUpdatedAppointment({
+          id: appointmentId,
+          appointmentId,
+          status: "AWAITING_REMAINING_PAYMENT",
+        });
+
         Swal.fire({
           icon: "success",
           title: "Thành công",
@@ -1373,6 +1400,158 @@ const AppointmentManagement: React.FC = () => {
       style: "currency",
       currency: "VND",
     }).format(price);
+  };
+
+  // Hàm kiểm tra thanh toán và chuyển status sang COMPLETED nếu thanh toán thành công
+  const checkPaymentAndUpdateStatus = async (appointmentId: string) => {
+    if (!appointmentId) return;
+
+    try {
+      // Lấy thông tin appointment mới nhất từ API
+      const response = await getStaffAppointmentDetail(appointmentId);
+      const appointment = response.data?.data || response.data;
+
+      if (!appointment) {
+        console.log("Không tìm thấy appointment để kiểm tra thanh toán");
+        return;
+      }
+
+      // Kiểm tra nếu status là AWAITING_REMAINING_PAYMENT và đã thanh toán xong
+      if (appointment.status === "AWAITING_REMAINING_PAYMENT") {
+        // Kiểm tra xem còn số tiền cần thanh toán không
+        const remainingAmount = appointment.transaction?.remainingAmount || 0;
+
+        // Nếu không còn số tiền cần thanh toán, chuyển sang COMPLETED
+        if (remainingAmount <= 0) {
+          console.log(
+            "Thanh toán phần còn lại đã hoàn thành, chuyển status sang COMPLETED"
+          );
+          applyUpdatedAppointment({
+            id: appointmentId,
+            appointmentId,
+            status: "COMPLETED",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error checking payment status:", error);
+    }
+  };
+
+  // Hàm xử lý thanh toán phần còn lại khi user bấm nút
+  const handleRemainingPayment = async () => {
+    if (!selectedAppointment) return;
+
+    const appointmentId =
+      selectedAppointment._id ||
+      selectedAppointment.appointmentId ||
+      selectedAppointment.id;
+
+    if (!appointmentId) {
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi",
+        text: "Không tìm thấy ID lịch hẹn",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+
+    // Kiểm tra xem còn số tiền cần thanh toán không
+    const remainingAmount =
+      selectedAppointment.transaction?.remainingAmount || 0;
+
+    if (remainingAmount <= 0) {
+      Swal.fire({
+        icon: "info",
+        title: "Thông báo",
+        text: "Không còn số tiền cần thanh toán",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+
+    try {
+      console.log(
+        `Tạo thanh toán phần còn lại: ${remainingAmount} VNĐ cho appointment ${appointmentId}`
+      );
+
+      // Gọi API thanh toán phần còn lại
+      const response = await api.post(
+        `/appointments/${appointmentId}/remaining-payment`,
+        {}
+      );
+
+      console.log("Remaining payment response:", response.data);
+
+      if (response.data.paymentUrl && response.data.qrCode) {
+        setQrData({
+          qrCode: response.data.qrCode,
+          paymentUrl: response.data.paymentUrl,
+          amount: response.data.amount || remainingAmount,
+          title: "Thanh toán phần còn lại",
+          description: `Thanh toán phần còn lại ${formatPrice(
+            remainingAmount
+          )} cho appointment ${appointmentId}`,
+          orderId: response.data.orderId,
+          appointmentId: appointmentId, // Lưu appointmentId để kiểm tra sau
+        });
+        setQrModalOpen(true);
+      } else {
+        Swal.fire({
+          icon: "success",
+          title: "Thành công",
+          text:
+            response.data.message ||
+            "Đã tạo thanh toán phần còn lại thành công",
+          confirmButtonColor: "#2563eb",
+        });
+      }
+    } catch (error) {
+      console.error("Error creating remaining payment:", error);
+      const axiosError = error as {
+        response?: {
+          data?: {
+            message?: string;
+            error?: string;
+            code?: string | number;
+          };
+        };
+      };
+
+      const errorCode = axiosError.response?.data?.code;
+      const errorMessage =
+        axiosError.response?.data?.message || axiosError.response?.data?.error;
+
+      let displayMessage =
+        errorMessage ||
+        "Không thể tạo thanh toán phần còn lại. Vui lòng thử lại.";
+
+      if (errorCode === 70 || errorMessage?.includes("70")) {
+        displayMessage =
+          "Lỗi VNPay (Mã 70): Phương thức thanh toán không hợp lệ. Vui lòng kiểm tra cấu hình thanh toán hoặc liên hệ bộ phận kỹ thuật.";
+      } else if (errorCode === 71 || errorMessage?.includes("71")) {
+        displayMessage =
+          "Lỗi VNPay (Mã 71): Có vấn đề với cấu hình thanh toán. Vui lòng liên hệ bộ phận kỹ thuật.";
+      }
+
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi thanh toán",
+        html: `
+          <div class="text-left">
+            <p class="mb-2">${displayMessage}</p>
+            ${
+              errorCode
+                ? `<p class="text-sm text-gray-500 mt-2">Mã lỗi: ${errorCode}</p>`
+                : ""
+            }
+            <p class="text-xs text-gray-400 mt-3">Nếu lỗi vẫn tiếp tục, vui lòng liên hệ bộ phận hỗ trợ.</p>
+          </div>
+        `,
+        confirmButtonColor: "#2563eb",
+      });
+    }
   };
 
   const handleBuyNow = async () => {
@@ -3378,6 +3557,21 @@ const AppointmentManagement: React.FC = () => {
                       </button>
                     </div>
                   )}
+
+                {/* Nút Thanh toán phần còn lại khi status là AWAITING_REMAINING_PAYMENT */}
+                {selectedAppointment.type !== "CONTRACT_NOTARIZATION" &&
+                  selectedAppointment.type !== "VEHICLE_HANDOVER" &&
+                  selectedAppointment.status ===
+                    "AWAITING_REMAINING_PAYMENT" && (
+                    <div className="mt-6 flex items-center justify-center">
+                      <button
+                        onClick={handleRemainingPayment}
+                        className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold text-lg shadow-lg"
+                      >
+                        Thanh toán phần còn lại
+                      </button>
+                    </div>
+                  )}
               </div>
             </div>
           </div>
@@ -3405,9 +3599,20 @@ const AppointmentManagement: React.FC = () => {
       {qrData && (
         <QRPaymentModal
           isOpen={qrModalOpen}
-          onClose={() => {
+          onClose={async () => {
+            const appointmentId = qrData.appointmentId;
             setQrModalOpen(false);
             setQrData(null);
+
+            // Kiểm tra thanh toán nếu là thanh toán phần còn lại
+            if (appointmentId && qrData.title?.includes("phần còn lại")) {
+              // Đợi một chút để backend xử lý thanh toán
+              setTimeout(async () => {
+                await checkPaymentAndUpdateStatus(appointmentId);
+                // Refresh danh sách appointments để cập nhật status
+                fetchAppointments();
+              }, 2000);
+            }
           }}
           qrCode={qrData.qrCode}
           paymentUrl={qrData.paymentUrl}
