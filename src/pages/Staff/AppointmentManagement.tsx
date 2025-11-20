@@ -1829,7 +1829,7 @@ const AppointmentManagement: React.FC = () => {
 
                         {appointment.status === "CONFIRMED" && (
                           <div className="relative dropdown-menu-container">
-                            <button
+                            {/* <button
                               onClick={() =>
                                 appointment.id && toggleDropdown(appointment.id)
                               }
@@ -1838,7 +1838,7 @@ const AppointmentManagement: React.FC = () => {
                               <FileText className="w-4 h-4 mr-1" />
                               In hợp đồng
                               <ChevronDown className="w-3 h-3 ml-1" />
-                            </button>
+                            </button> */}
 
                             {dropdownOpen === appointment.id && (
                               <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
