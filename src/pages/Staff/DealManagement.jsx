@@ -362,9 +362,9 @@ const DealDetailModal = ({
             {milestone.status || milestone.state || "—"}
           </span>
         </p> */}
-        {milestone.scheduledAt && (
+        {/* {milestone.scheduledAt && (
           <p>Thời gian: {formatDateTime(milestone.scheduledAt)}</p>
-        )}
+        )} */}
         
       </div>
     );
@@ -380,7 +380,7 @@ const DealDetailModal = ({
         <div className="border-b border-gray-200 px-6 py-4 flex items-start justify-between gap-4">
           <div>
             <p className="text-xs uppercase text-gray-500">
-              Chi tiết giao dịch
+              Chi tiết giấy tờ
             </p>
             
             <p className="text-sm text-gray-500 mt-1">
@@ -495,6 +495,11 @@ const DealDetailModal = ({
                       </div>
                       <StatusBadge status={status} />
                     </div>
+                    {data.createdAt && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Tạo lúc: {formatDateTime(data.createdAt)}
+                      </p>
+                    )}
                     {data.note && (
                       <p className="text-sm text-gray-600 mt-1">
                         Ghi chú: {data.note}
@@ -636,15 +641,6 @@ const DealDetailModal = ({
               className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50"
             >
               Đóng
-            </button>
-            <button
-              onClick={() =>
-                window.open(`/transactions/${dealState.dealId}`, "_blank")
-              }
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-2"
-            >
-              <Eye className="w-4 h-4" />
-              Xem giao dịch
             </button>
           </div>
         </div>
@@ -1109,7 +1105,7 @@ const DealManagement = () => {
   );
 
   const filteredDeals = useMemo(() => {
-    return normalizedDeals.filter((deal) => {
+    const filtered = normalizedDeals.filter((deal) => {
       const matchStatus =
         statusFilter === "all" || deal.status === statusFilter;
       const keyword = searchKeyword.trim().toLowerCase();
@@ -1120,6 +1116,12 @@ const DealManagement = () => {
         deal.seller.name.toLowerCase().includes(keyword) ||
         deal.listing.title.toLowerCase().includes(keyword);
       return matchStatus && matchKeyword;
+    });
+    // Sort by newest first (dealCreatedAt)
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.timeline?.dealCreatedAt || 0).getTime();
+      const dateB = new Date(b.timeline?.dealCreatedAt || 0).getTime();
+      return dateB - dateA; // Descending order (newest first)
     });
   }, [normalizedDeals, statusFilter, searchKeyword]);
 
@@ -1343,13 +1345,13 @@ const DealManagement = () => {
                       Xe
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Buyer / Seller
+                      Buyer
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Seller
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Giá xe
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Trạng thái
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Tiến độ giấy tờ
@@ -1393,11 +1395,11 @@ const DealManagement = () => {
                           <div className="text-xs text-gray-500">
                             {deal.buyer.phone} · {deal.buyer.email}
                           </div>
-                          <div className="mt-2 text-xs text-gray-500">
-                            Seller:{" "}
-                            <span className="font-medium text-gray-800">
-                              {deal.seller.name}
-                            </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-700">
+                          <div className="font-medium">{deal.seller.name}</div>
+                          <div className="text-xs text-gray-500">
+                            {deal.seller.phone} · {deal.seller.email}
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-700">
@@ -1408,9 +1410,6 @@ const DealManagement = () => {
                             Cọc:{" "}
                             {formatCurrency(deal.paymentPlan?.depositAmount)}
                           </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <StatusBadge status={deal.status} />
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-700">
                           {(() => {

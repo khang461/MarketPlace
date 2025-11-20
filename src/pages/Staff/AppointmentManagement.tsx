@@ -1139,14 +1139,14 @@ const AppointmentManagement: React.FC = () => {
       setNotarizationProofFiles([]);
       setNotarizationNote("");
 
-      Swal.fire({
-        icon: "success",
+        Swal.fire({
+          icon: "success",
         title: "Thành công",
         text: response.data?.message || "Đã upload bằng chứng công chứng.",
-        confirmButtonColor: "#2563eb",
+          confirmButtonColor: "#2563eb",
         timer: 1500,
-        showConfirmButton: false,
-      });
+          showConfirmButton: false,
+        });
 
       applyUpdatedAppointment({
         id: appointmentId,
@@ -1159,14 +1159,14 @@ const AppointmentManagement: React.FC = () => {
       const axiosError = error as {
         response?: { data?: { message?: string } };
       };
-      Swal.fire({
-        icon: "error",
+        Swal.fire({
+          icon: "error",
         title: "Upload thất bại",
-        text:
+          text:
           axiosError.response?.data?.message ||
           "Không thể upload bằng chứng công chứng. Vui lòng thử lại.",
-        confirmButtonColor: "#2563eb",
-      });
+          confirmButtonColor: "#2563eb",
+        });
     } finally {
       setIsUploadingNotarizationProofs(false);
     }
@@ -1379,7 +1379,7 @@ const AppointmentManagement: React.FC = () => {
       Swal.fire({
         icon: "error",
         title: "Lỗi thanh toán",
-        html: `
+      html: `
           <div class="text-left">
             <p class="mb-2">${displayMessage}</p>
             ${
@@ -2183,8 +2183,7 @@ const AppointmentManagement: React.FC = () => {
               <option value="VEHICLE_INSPECTION">Xem xe</option>
               <option value="CONTRACT_SIGNING">Ký hợp đồng</option>
               <option value="CONTRACT_NOTARIZATION">Công chứng hợp đồng</option>
-              <option value="DELIVERY">Bàn giao xe</option>
-              <option value="VEHICLE_HANDOVER">Bàn giao xe (Vehicle)</option>
+              <option value="VEHICLE_HANDOVER">Bàn giao xe</option>
             </select>
           </div>
 
@@ -2422,101 +2421,101 @@ const AppointmentManagement: React.FC = () => {
         selectedAppointment &&
         selectedAppointment.type !== "VEHICLE_INSPECTION" && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-              {/* Header */}
-              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Chi tiết lịch hẹn
-                </h2>
-                <button
-                  onClick={closeModal}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <XCircle className="w-6 h-6" />
-                </button>
-              </div>
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">
+                Chi tiết lịch hẹn
+              </h2>
+              <button
+                onClick={closeModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
 
-              {/* Content */}
-              <div className="p-6">
-                {/* Thông tin xe và giao dịch */}
-                <div className="mb-6 grid grid-cols-2 gap-4">
-                  {/* Card trái: Thông tin xe */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                      Thông tin xe
-                    </h3>
-                    <div className="space-y-2">
-                      <p className="text-gray-700">
-                        <span className="font-medium">Xe:</span>{" "}
-                        {selectedAppointment.vehicle?.make || "N/A"}{" "}
-                        {selectedAppointment.vehicle?.model || "N/A"}{" "}
-                        {selectedAppointment.vehicle?.year || "N/A"}
-                      </p>
-                      <p className="text-gray-700">
-                        <span className="font-medium">Tiêu đề:</span>{" "}
-                        {selectedAppointment.vehicle?.title || "N/A"}
-                      </p>
-                      <p className="text-gray-700">
-                        <span className="font-medium">Thời gian:</span>{" "}
-                        {formatDate(selectedAppointment.scheduledDate)}
-                      </p>
-                      <p className="text-gray-700">
-                        <span className="font-medium">Địa điểm:</span>{" "}
-                        {selectedAppointment.location}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Card phải: Thông tin giao dịch */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                      Thông tin giao dịch
-                    </h3>
-                    <div className="space-y-2">
-                      <p className="text-gray-700">
-                        <span className="font-medium">Giá xe:</span>{" "}
-                        {(
-                          selectedAppointment.transaction?.vehiclePrice ||
-                          selectedAppointment.vehicle?.price ||
-                          0
-                        ).toLocaleString("vi-VN")}{" "}
-                        VNĐ
-                      </p>
-                      <p className="text-gray-700">
-                        <span className="font-medium">Tiền đặt cọc:</span>{" "}
-                        {(
-                          selectedAppointment.transaction?.depositAmount || 0
-                        ).toLocaleString("vi-VN")}{" "}
-                        VNĐ{" "}
-                        {selectedAppointment.transaction?.depositPercentage
-                          ? `(${selectedAppointment.transaction.depositPercentage})`
-                          : ""}
-                      </p>
-                      <p className="text-gray-700">
-                        <span className="font-medium">Số tiền còn lại:</span>{" "}
-                        {(
-                          selectedAppointment.transaction?.remainingAmount || 0
-                        ).toLocaleString("vi-VN")}{" "}
-                        VNĐ
-                      </p>
-                      {/* Hiển thị nhân viên xử lý chỉ khi COMPLETED */}
-                      {selectedAppointment.status === "COMPLETED" && (
-                        <p className="text-gray-700 mt-2">
-                          <span className="font-medium">Nhân viên xử lý:</span>{" "}
-                          {selectedAppointment.staff ? (
-                            <span className="font-semibold text-purple-600">
-                              {selectedAppointment.staff.name}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 italic">
-                              Chưa phân công
-                            </span>
-                          )}
-                        </p>
-                      )}
-                    </div>
+            {/* Content */}
+            <div className="p-6">
+              {/* Thông tin xe và giao dịch */}
+              <div className="mb-6 grid grid-cols-2 gap-4">
+                {/* Card trái: Thông tin xe */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                    Thông tin xe
+                  </h3>
+                  <div className="space-y-2">
+                    <p className="text-gray-700">
+                      <span className="font-medium">Xe:</span>{" "}
+                      {selectedAppointment.vehicle?.make || "N/A"}{" "}
+                      {selectedAppointment.vehicle?.model || "N/A"}{" "}
+                      {selectedAppointment.vehicle?.year || "N/A"}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-medium">Tiêu đề:</span>{" "}
+                      {selectedAppointment.vehicle?.title || "N/A"}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-medium">Thời gian:</span>{" "}
+                      {formatDate(selectedAppointment.scheduledDate)}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-medium">Địa điểm:</span>{" "}
+                      {selectedAppointment.location}
+                    </p>
                   </div>
                 </div>
+
+                {/* Card phải: Thông tin giao dịch */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                    Thông tin giao dịch
+                  </h3>
+                  <div className="space-y-2">
+                    <p className="text-gray-700">
+                      <span className="font-medium">Giá xe:</span>{" "}
+                      {(
+                        selectedAppointment.transaction?.vehiclePrice ||
+                        selectedAppointment.vehicle?.price ||
+                        0
+                      ).toLocaleString("vi-VN")}{" "}
+                      VNĐ
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-medium">Tiền đặt cọc:</span>{" "}
+                      {(
+                        selectedAppointment.transaction?.depositAmount || 0
+                      ).toLocaleString("vi-VN")}{" "}
+                      VNĐ{" "}
+                      {selectedAppointment.transaction?.depositPercentage
+                        ? `(${selectedAppointment.transaction.depositPercentage})`
+                        : ""}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-medium">Số tiền còn lại:</span>{" "}
+                      {(
+                        selectedAppointment.transaction?.remainingAmount || 0
+                      ).toLocaleString("vi-VN")}{" "}
+                      VNĐ
+                    </p>
+                    {/* Hiển thị nhân viên xử lý chỉ khi COMPLETED */}
+                    {selectedAppointment.status === "COMPLETED" && (
+                      <p className="text-gray-700 mt-2">
+                        <span className="font-medium">Nhân viên xử lý:</span>{" "}
+                        {selectedAppointment.staff ? (
+                          <span className="font-semibold text-purple-600">
+                            {selectedAppointment.staff.name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic">
+                            Chưa phân công
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
 
                 {renderConfirmationSection()}
 
@@ -3088,7 +3087,54 @@ const AppointmentManagement: React.FC = () => {
                   selectedAppointment.type || ""
                 ) && (
                   <div className="mt-6 space-y-5">
-                    <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+                    {/* Thông tin người mua và người bán cho VEHICLE_HANDOVER */}
+                    {selectedAppointment.type === "VEHICLE_HANDOVER" && (
+                      <div className="grid grid-cols-2 gap-6 mb-6">
+                        {/* Bên Bán */}
+                        <div>
+                          <h3 className="text-lg font-semibold text-orange-700 mb-3">
+                            🟠 Bên Bán
+                          </h3>
+                          <div className="bg-orange-50 rounded-lg p-4">
+                            <p className="text-gray-700">
+                              <span className="font-medium">Tên:</span>{" "}
+                              {selectedAppointment.seller?.name || "N/A"}
+                            </p>
+                            <p className="text-gray-700 mt-2">
+                              <span className="font-medium">Email:</span>{" "}
+                              {selectedAppointment.seller?.email || "N/A"}
+                            </p>
+                            <p className="text-gray-700 mt-2">
+                              <span className="font-medium">Số điện thoại:</span>{" "}
+                              {selectedAppointment.seller?.phone || "N/A"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Bên Mua */}
+                        <div>
+                          <h3 className="text-lg font-semibold text-green-700 mb-3">
+                            🟢 Bên Mua
+                          </h3>
+                          <div className="bg-green-50 rounded-lg p-4">
+                            <p className="text-gray-700">
+                              <span className="font-medium">Tên:</span>{" "}
+                              {selectedAppointment.buyer?.name || "N/A"}
+                            </p>
+                            <p className="text-gray-700 mt-2">
+                              <span className="font-medium">Email:</span>{" "}
+                              {selectedAppointment.buyer?.email || "N/A"}
+                            </p>
+                            <p className="text-gray-700 mt-2">
+                              <span className="font-medium">Số điện thoại:</span>{" "}
+                              {selectedAppointment.buyer?.phone || "N/A"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* <div className="border border-gray-200 rounded-lg p-4 space-y-3">
                       {selectedAppointment.slotFinalized ||
                       selectedAppointment.status === "CONFIRMED" ? (
                         <div className="bg-green-50 border border-green-100 text-green-700 rounded-lg px-3 py-2 text-sm">
@@ -3101,7 +3147,7 @@ const AppointmentManagement: React.FC = () => {
                               : "Đang cập nhật"}
                           </strong>
                         </div>
-                      ) : (
+                      ) : selectedAppointment.type !== "VEHICLE_HANDOVER" ? (
                         <div className="text-sm text-gray-600">
                           <p>
                             Trạng thái:{" "}
@@ -3117,7 +3163,7 @@ const AppointmentManagement: React.FC = () => {
                             </span>
                           </p>
                         </div>
-                      )}
+                      ) : null}
 
                       <div>
                         <p className="text-sm font-medium text-gray-700 mb-2">
@@ -3148,9 +3194,32 @@ const AppointmentManagement: React.FC = () => {
                             Chưa có khung giờ nào được gửi. Nhấn “Gửi lịch bàn
                             giao” để bắt đầu.
                           </p>
-                        )}
-                      </div>
-                    </div>
+                        {selectedAppointment.proposedSlots &&
+                        selectedAppointment.proposedSlots.length > 0 ? (
+                            <div className="space-y-2">
+                              {selectedAppointment.proposedSlots.map((slot, idx) => (
+                                <div
+                                  key={`${slot}-${idx}`}
+                                  className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2 text-sm"
+                                >
+                                  <span>{formatDate(slot)}</span>
+                                  {selectedAppointment.selectedSlot === slot && (
+                                    <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                                      Đã chọn
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500">
+                              Chưa có khung giờ nào được gửi. Nhấn "Gửi lịch bàn giao" để
+                              bắt đầu.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div> */}
 
                     <div className="border border-indigo-100 rounded-lg p-4 space-y-4">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -3576,6 +3645,7 @@ const AppointmentManagement: React.FC = () => {
             </div>
           </div>
         )}
+
       {selectedAppointment && (
         <VehicleInspectionModal
           appointment={selectedAppointment}
