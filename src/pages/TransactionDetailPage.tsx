@@ -9,10 +9,17 @@ import {
   Image as ImageIcon,
   CheckCircle,
   XCircle,
+  Clock,
 } from "lucide-react";
 import ImagePreviewModal from "../components/ImagePreviewModal";
 import QRPaymentModal from "../components/QRPaymentModal";
 import { generateRemainingPaymentQR } from "../config/depositPaymentAPI";
+import {
+  getContractInfo,
+  getContractTimeline,
+  type TimelineStepData,
+  type TimelineStep,
+} from "../config/contractAPI";
 import Swal from "sweetalert2";
 
 interface Transaction {
@@ -89,6 +96,9 @@ export default function TransactionDetailPage() {
   } | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
+  // Contract states - chỉ cần timeline
+  const [timeline, setTimeline] = useState<TimelineStepData[]>([]);
+
   const loadTransaction = async () => {
     if (!transactionId) return;
     setLoading(true);
@@ -122,10 +132,135 @@ export default function TransactionDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionId]);
 
+  useEffect(() => {
+    if (transaction?.appointmentId) {
+      loadContractData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transaction?.appointmentId, transaction?.status, transaction?.amount]);
+
   const openImagePreview = (images: string[], index: number) => {
     setPreviewImages(images);
     setPreviewIndex(index);
     setIsPreviewOpen(true);
+  };
+
+  const loadContractData = async () => {
+    if (!transaction?.appointmentId) {
+      console.log("No appointmentId, skipping contract load");
+      return;
+    }
+
+    // Kiểm tra xem giao dịch đã thanh toán 100% chưa
+    const { deposit, total, remaining } = transaction.amount || {};
+
+    // Kiểm tra nếu amount không tồn tại
+    if (
+      deposit === undefined ||
+      total === undefined ||
+      remaining === undefined
+    ) {
+      console.log("Amount data not available", { deposit, total, remaining });
+      return;
+    }
+
+    // Thanh toán 100% nghĩa là:
+    // - remaining === 0 (không còn tiền cần thanh toán)
+    // - HOẶC deposit === total (đã thanh toán đủ bằng tổng)
+    // - HOẶC deposit + remaining === total (tổng đã thanh toán bằng tổng)
+    // - VÀ status phải là COMPLETED
+    const isFullPayment =
+      transaction.status === "COMPLETED" &&
+      (remaining === 0 || deposit === total || deposit + remaining === total);
+
+    console.log("loadContractData - Checking conditions:", {
+      appointmentId: transaction.appointmentId,
+      status: transaction.status,
+      deposit,
+      total,
+      remaining,
+      isFullPayment,
+      condition1: remaining === 0,
+      condition2: deposit === total,
+      condition3: deposit + remaining === total,
+    });
+
+    // Chỉ load timeline nếu đã thanh toán 100% và status là COMPLETED
+    if (!isFullPayment) {
+      console.log("Not full payment or not completed, skipping timeline load");
+      setTimeline([]); // Clear timeline nếu không đủ điều kiện
+      return;
+    }
+
+    console.log("Loading contract data - conditions met");
+
+    try {
+      // Load contract info để lấy contractId
+      console.log(
+        "Calling getContractInfo for appointmentId:",
+        transaction.appointmentId
+      );
+      const infoResponse = await getContractInfo(transaction.appointmentId);
+      console.log("getContractInfo response:", infoResponse);
+
+      // Try to extract contractId from response
+      const responseData = infoResponse as {
+        contractId?: string;
+        _id?: string;
+        contractInfo?: unknown;
+      };
+      console.log("Extracted responseData:", responseData);
+
+      const id = responseData.contractId || responseData._id;
+
+      if (!id) {
+        console.log(
+          "No contractId found in response, contract may not exist yet"
+        );
+        setTimeline([]);
+        return;
+      }
+
+      console.log("contractId found:", id);
+
+      // Load timeline if contractId exists
+      try {
+        console.log("Calling getContractTimeline for contractId:", id);
+        const timelineResponse = await getContractTimeline(id);
+        console.log("getContractTimeline response:", timelineResponse);
+
+        // Lấy timeline từ response (có thể là timeline hoặc data)
+        const timelineData =
+          timelineResponse.timeline || timelineResponse.data || [];
+
+        console.log("Timeline data extracted:", timelineData);
+        console.log("Timeline length:", timelineData.length);
+
+        setTimeline(timelineData);
+        console.log("Timeline set successfully:", timelineData);
+      } catch (err) {
+        console.error("Error loading timeline:", err);
+        setTimeline([]);
+      }
+    } catch (error: unknown) {
+      // Contract might not exist yet - this is OK
+      const axiosError = error as {
+        response?: {
+          status?: number;
+          data?: { message?: string };
+        };
+      };
+
+      console.error("Error loading contract:", error);
+      console.error("Error status:", axiosError.response?.status);
+      console.error("Error message:", axiosError.response?.data?.message);
+
+      setTimeline([]);
+
+      if (axiosError.response?.status !== 404) {
+        console.error("Error loading contract (non-404):", error);
+      }
+    }
   };
 
   const handleRemainingPayment = async () => {
@@ -460,7 +595,9 @@ export default function TransactionDetailPage() {
                     const imageUrl = photo.url.startsWith("http")
                       ? photo.url
                       : `${api.defaults.baseURL || ""}${
-                          photo.url.startsWith("/") ? photo.url : "/" + photo.url
+                          photo.url.startsWith("/")
+                            ? photo.url
+                            : "/" + photo.url
                         }`;
                     return (
                       <div
@@ -504,9 +641,9 @@ export default function TransactionDetailPage() {
                 {transaction.contract.completedAt && (
                   <p className="text-xs text-gray-500">
                     Hoàn thành:{" "}
-                    {new Date(
-                      transaction.contract.completedAt
-                    ).toLocaleString("vi-VN")}
+                    {new Date(transaction.contract.completedAt).toLocaleString(
+                      "vi-VN"
+                    )}
                   </p>
                 )}
               </div>
@@ -527,6 +664,204 @@ export default function TransactionDetailPage() {
               </div>
             )}
 
+          {/* Timeline Section - Chỉ hiển thị cho giao dịch đã thanh toán 100% */}
+          {(() => {
+            // Kiểm tra xem giao dịch đã thanh toán 100% chưa
+            const { deposit, total, remaining } = transaction.amount || {};
+
+            // Kiểm tra nếu amount không tồn tại
+            if (
+              deposit === undefined ||
+              total === undefined ||
+              remaining === undefined
+            ) {
+              return null;
+            }
+
+            // Thanh toán 100% nghĩa là:
+            // - remaining === 0 (không còn tiền cần thanh toán)
+            // - HOẶC deposit === total (đã thanh toán đủ bằng tổng)
+            // - HOẶC deposit + remaining === total (tổng đã thanh toán bằng tổng)
+            // - VÀ status phải là COMPLETED
+            const isFullPayment =
+              transaction.status === "COMPLETED" &&
+              (remaining === 0 ||
+                deposit === total ||
+                deposit + remaining === total);
+
+            // Chỉ hiển thị timeline nếu đã thanh toán 100% và có timeline data
+            const shouldShowTimeline = isFullPayment && timeline.length > 0;
+
+            console.log("shouldShowTimeline check:", {
+              deposit,
+              total,
+              remaining,
+              status: transaction.status,
+              isFullPayment,
+              timelineLength: timeline.length,
+              shouldShowTimeline,
+            });
+
+            if (!shouldShowTimeline) {
+              console.log("Timeline not shown - conditions not met");
+              return null;
+            }
+
+            return (
+              <div className="border-t mt-6 pt-6">
+                <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-indigo-600" />
+                  Timeline hợp đồng
+                </h3>
+                <div className="space-y-4">
+                  {(() => {
+                    // Lấy tất cả steps từ timeline backend, nhưng giữ thứ tự cố định
+                    const allSteps: TimelineStep[] = [
+                      "SIGN_CONTRACT",
+                      "NOTARIZATION",
+                      "SUBMIT_REGISTRATION",
+                      "WAITING_FOR_NEW_PAPERS",
+                      "TRANSFER_OWNERSHIP",
+                      "HANDOVER_PAPERS_AND_CAR",
+                      "COMPLETED",
+                    ];
+
+                    // Lọc chỉ hiển thị các step có trong timeline từ backend
+                    const stepsToShow = allSteps.filter((step) =>
+                      timeline.some((t) => t.step === step)
+                    );
+
+                    return stepsToShow.map((step, index) => {
+                      const stepData = timeline.find((t) => t.step === step) as
+                        | TimelineStepData
+                        | undefined;
+                      const status = stepData?.status || "PENDING";
+                      const isLast = index === stepsToShow.length - 1;
+
+                      const stepLabels: Record<string, string> = {
+                        SIGN_CONTRACT: "Ký hợp đồng",
+                        NOTARIZATION: "Công chứng",
+                        SUBMIT_REGISTRATION: "Nộp đăng ký",
+                        WAITING_FOR_NEW_PAPERS: "Chờ giấy tờ mới",
+                        TRANSFER_OWNERSHIP: "Chuyển quyền sở hữu",
+                        HANDOVER_PAPERS_AND_CAR: "Bàn giao giấy tờ và xe",
+                        COMPLETED: "Hoàn tất",
+                      };
+
+                      const statusLabels: Record<string, string> = {
+                        PENDING: "Chờ xử lý",
+                        IN_PROGRESS: "Đang thực hiện",
+                        DONE: "Hoàn thành",
+                        BLOCKED: "Bị chặn",
+                      };
+
+                      const statusColors: Record<string, string> = {
+                        PENDING: "bg-gray-100 text-gray-700 border-gray-300",
+                        IN_PROGRESS:
+                          "bg-blue-100 text-blue-700 border-blue-300",
+                        DONE: "bg-green-100 text-green-700 border-green-300",
+                        BLOCKED: "bg-red-100 text-red-700 border-red-300",
+                      };
+
+                      return (
+                        <div key={step} className="flex gap-4">
+                          {/* Timeline line */}
+                          <div className="flex flex-col items-center">
+                            <div
+                              className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                                status === "DONE"
+                                  ? "bg-green-500 border-green-500 text-white"
+                                  : status === "IN_PROGRESS"
+                                  ? "bg-blue-500 border-blue-500 text-white"
+                                  : status === "BLOCKED"
+                                  ? "bg-red-500 border-red-500 text-white"
+                                  : "bg-gray-200 border-gray-300 text-gray-500"
+                              }`}
+                            >
+                              {status === "DONE" ? (
+                                <CheckCircle className="w-5 h-5" />
+                              ) : status === "BLOCKED" ? (
+                                <XCircle className="w-5 h-5" />
+                              ) : (
+                                <Clock className="w-5 h-5" />
+                              )}
+                            </div>
+                            {!isLast && (
+                              <div
+                                className={`w-0.5 h-full min-h-[60px] ${
+                                  status === "DONE"
+                                    ? "bg-green-500"
+                                    : "bg-gray-300"
+                                }`}
+                              />
+                            )}
+                          </div>
+
+                          {/* Step content */}
+                          <div className="flex-1 pb-6">
+                            <div className="mb-2">
+                              <h4 className="font-semibold text-gray-900">
+                                {stepLabels[step]}
+                              </h4>
+                              <span
+                                className={`inline-block px-2 py-1 rounded text-xs font-medium mt-1 ${statusColors[status]}`}
+                              >
+                                {statusLabels[status]}
+                              </span>
+                            </div>
+                            {stepData?.note && (
+                              <p className="text-gray-600 text-sm mb-2">
+                                {stepData.note}
+                              </p>
+                            )}
+                            {stepData?.dueDate && (
+                              <p className="text-gray-500 text-xs">
+                                Hạn:{" "}
+                                {new Date(stepData.dueDate).toLocaleDateString(
+                                  "vi-VN"
+                                )}
+                              </p>
+                            )}
+                            {stepData?.updatedAt && (
+                              <p className="text-gray-500 text-xs">
+                                Cập nhật:{" "}
+                                {new Date(stepData.updatedAt).toLocaleString(
+                                  "vi-VN"
+                                )}
+                              </p>
+                            )}
+                            {stepData?.attachments &&
+                              stepData.attachments.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs text-gray-600 mb-1">
+                                    Đính kèm:
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {stepData.attachments.map((att, idx) => (
+                                      <a
+                                        key={idx}
+                                        href={att.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:underline text-xs flex items-center gap-1"
+                                      >
+                                        <ImageIcon className="w-3 h-3" />
+                                        {att.description || `File ${idx + 1}`}
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Transaction Dates */}
           <div className="border-t mt-6 pt-6">
             <h3 className="font-semibold mb-3">Lịch sử giao dịch</h3>
@@ -535,7 +870,9 @@ export default function TransactionDetailPage() {
                 <Calendar className="w-4 h-4 text-gray-400" />
                 <span className="text-gray-600">
                   Tạo:{" "}
-                  {new Date(transaction.dates.createdAt).toLocaleString("vi-VN")}
+                  {new Date(transaction.dates.createdAt).toLocaleString(
+                    "vi-VN"
+                  )}
                 </span>
               </div>
               {transaction.dates.completedAt && (
@@ -593,4 +930,3 @@ export default function TransactionDetailPage() {
     </div>
   );
 }
-
