@@ -38,8 +38,15 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
     navigate("/signin");
   };
 
-  // Active: match cả route con
-  const isActive = (path: string) => location.pathname.startsWith(path);
+  // Active: match chính xác cho trang chủ, match route con cho các trang khác
+  const isActive = (path: string) => {
+    if (path === "/staff") {
+      // Trang chủ chỉ active khi pathname chính xác là "/staff"
+      return location.pathname === "/staff";
+    }
+    // Các trang khác match với route con
+    return location.pathname.startsWith(path);
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -68,7 +75,11 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
       label: "Phê duyệt đấu giá",
     },
     { path: "/staff/contracts", icon: FileText, label: "Hợp đồng" },
-    { path: "/staff/deal-management", icon: DollarSign, label: "Tiến trình giao dịch" },
+    {
+      path: "/staff/deal-management",
+      icon: DollarSign,
+      label: "Tiến trình giao dịch",
+    },
     { path: "/staff/users", icon: Users, label: "Quản lý người dùng" },
   ];
 
@@ -167,12 +178,14 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
       </nav>
 
       {/* Main Layout */}
-      <div className="flex pt-14">
+      <div className={"flex pt-14"}>
         {/* Sidebar */}
         <aside
-          className={`bg-white dark:bg-gray-800 shadow-sm border-r border-gray-200 dark:border-gray-700 transition-all duration-300 ${
-            sidebarOpen ? "w-64" : "w-0"
-          } overflow-hidden min-h-screen`}
+          className={`bg-white dark:bg-gray-800 shadow-sm border-r border-gray-200 dark:border-gray-700 transition-all duration-300 flex-shrink-0 ${
+            sidebarOpen ? "w-[20%]" : "w-0"
+          } ${
+            sidebarOpen ? "overflow-visible" : "overflow-hidden"
+          } min-h-screen`}
         >
           <div className="p-6 h-full flex flex-col">
             <nav className="space-y-4 flex-1">
@@ -219,8 +232,8 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
 
         {/* Main Content */}
         <main
-          className={`flex-1 transition-all duration-300 ${
-            sidebarOpen ? "ml-0" : "ml-0"
+          className={`transition-all duration-300 flex-shrink-0 ${
+            sidebarOpen ? "w-[80%]" : "w-full"
           }`}
         >
           <div className="p-6">{children}</div>
