@@ -13,6 +13,7 @@ import {
   Moon,
   Sun,
   Gavel,
+  DollarSign,
 } from "lucide-react";
 
 interface StaffLayoutProps {
@@ -67,6 +68,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
       label: "Phê duyệt đấu giá",
     },
     { path: "/staff/contracts", icon: FileText, label: "Hợp đồng" },
+    { path: "/staff/deal-management", icon: DollarSign, label: "Tiến trình giao dịch" },
     { path: "/staff/users", icon: Users, label: "Quản lý người dùng" },
   ];
 

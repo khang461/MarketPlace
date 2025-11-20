@@ -3,21 +3,20 @@ import { X, Calendar, MapPin, FileText, Loader2 } from "lucide-react";
 import api from "../../config/api";
 import Swal from "sweetalert2";
 
+const DEFAULT_LOCATION = "Showroom EV - 123 Hai Bà Trưng";
+
 interface AppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   chatId: string;
-  listingLocation?: string; // Địa chỉ từ listing nếu có
 }
 
 const AppointmentModal: React.FC<AppointmentModalProps> = ({
   isOpen,
   onClose,
   chatId,
-  listingLocation,
 }) => {
   const [scheduledDate, setScheduledDate] = useState("");
-  const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -29,21 +28,13 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
       // Format for datetime-local input (YYYY-MM-DDTHH:mm)
       const formattedDate = defaultDate.toISOString().slice(0, 16);
       setScheduledDate(formattedDate);
-
-      // Set default location suggestion
-      if (listingLocation) {
-        setLocation(`Theo địa chỉ trong tin đăng: ${listingLocation}`);
-      } else {
-        setLocation("Showroom EV - 123 Hai Bà Trưng");
-      }
     }
-  }, [isOpen, listingLocation]);
+  }, [isOpen]);
 
   // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
       setScheduledDate("");
-      setLocation("");
       setNotes("");
       setIsSubmitting(false);
     }
@@ -81,9 +72,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
       if (scheduledDate) {
         requestBody.scheduledDate = dateToSend;
       }
-      if (location.trim()) {
-        requestBody.location = location.trim();
-      }
+      requestBody.location = DEFAULT_LOCATION;
       if (notes.trim()) {
         requestBody.notes = notes.trim();
       }
@@ -104,14 +93,15 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
       } else {
         throw new Error(response.data.message || "Có lỗi xảy ra");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating appointment:", error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
       Swal.fire({
         icon: "error",
         title: "Lỗi",
         text:
-          error.response?.data?.message ||
-          error.message ||
+          axiosError.response?.data?.message ||
+          (error instanceof Error ? error.message : undefined) ||
           "Không thể tạo lịch hẹn. Vui lòng thử lại.",
       });
     } finally {
@@ -170,31 +160,20 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               disabled={isSubmitting}
               min={new Date().toISOString().slice(0, 16)}
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Để trống sẽ tự động đặt sau 3 ngày
-            </p>
+           
           </div>
 
-          {/* Location */}
+          {/* Location (fixed) */}
           <div>
-            <label
-              htmlFor="location"
-              className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2"
-            >
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
               <MapPin className="w-4 h-4" />
-              Địa điểm
+              Địa điểm (cố định)
             </label>
-            <input
-              type="text"
-              id="location"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Nhập địa điểm xem xe"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={isSubmitting}
-            />
+            <div className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+              {DEFAULT_LOCATION}
+            </div>
             <p className="text-xs text-gray-500 mt-1">
-              Để trống sẽ tự động đặt "Thỏa thuận thêm trong cuộc trò chuyện"
+               Tất cả lịch xem xe diễn ra tại showroom này.
             </p>
           </div>
 
