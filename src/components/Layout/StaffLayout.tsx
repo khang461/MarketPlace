@@ -13,6 +13,7 @@ import {
   Moon,
   Sun,
   Gavel,
+  DollarSign,
 } from "lucide-react";
 
 interface StaffLayoutProps {
@@ -67,11 +68,10 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
       label: "Phê duyệt đấu giá",
     },
     { path: "/staff/contracts", icon: FileText, label: "Hợp đồng" },
+    { path: "/staff/deal-management", icon: DollarSign, label: "Tiến trình giao dịch" },
     { path: "/staff/users", icon: Users, label: "Quản lý người dùng" },
   ];
 
-  const initials =
-    (user?.fullName?.[0] || user?.name?.[0] || user?.email?.[0] || "S").toUpperCase();
   const displayName = user?.fullName || user?.name || "Staff";
 
   return (
@@ -123,12 +123,15 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
                 </div>
                 <div className="text-left hidden sm:block">
                   <div className="text-sm font-medium text-gray-900 dark:text-white">
-                    {user?.name || "Staff"}
+                    {displayName}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Staff
+                    {user?.role === "admin"
+                      ? "Admin"
+                      : user?.role === "staff"
+                      ? "Staff"
+                      : ""}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Staff</div>
                 </div>
                 <ChevronDown className="w-4 h-4 text-gray-500" />
               </button>

@@ -9,7 +9,6 @@ import {
   CheckCircle,
   XCircle,
   FileText,
-  ChevronDown,
   Image as ImageIcon,
   Trash2,
 } from "lucide-react";
@@ -26,13 +25,16 @@ export interface Appointment {
   id?: string;
   appointmentId?: string;
   auctionId?: string;
+  dealId?: string;
   scheduledDate: string;
   location: string;
   status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "RESCHEDULED";
   type:
     | "VEHICLE_INSPECTION"
     | "CONTRACT_SIGNING"
+    | "CONTRACT_NOTARIZATION"
     | "DELIVERY"
+    | "VEHICLE_HANDOVER"
     | "INSPECTION"
     | "OTHER"
     | string;
@@ -107,6 +109,19 @@ export interface Appointment {
     email?: string;
     phone?: string;
   } | null;
+  notarizationProofs?: Array<{
+    url?: string;
+    description?: string;
+    uploadedAt?: string;
+  }>;
+  handoverProofs?: Array<{
+    url?: string;
+    description?: string;
+    uploadedAt?: string;
+  }>;
+  proposedSlots?: string[];
+  selectedSlot?: string;
+  slotFinalized?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -161,6 +176,9 @@ const extractStaffInfo = (source: unknown): StaffInfo | null => {
   return null;
 };
 
+const MAX_NOTARIZATION_PROOF_FILES = 10;
+const MAX_HANDOVER_PROOF_FILES = 10;
+
 const AppointmentManagement: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -199,6 +217,22 @@ const AppointmentManagement: React.FC = () => {
   const [staffLoadingMap, setStaffLoadingMap] = useState<
     Record<string, boolean>
   >({});
+  const [notarizationProofFiles, setNotarizationProofFiles] = useState<File[]>(
+    []
+  );
+  const [notarizationNote, setNotarizationNote] = useState("");
+  const [isUploadingNotarizationProofs, setIsUploadingNotarizationProofs] =
+    useState(false);
+  const [notarizationProofs, setNotarizationProofs] = useState<
+    { url?: string; description?: string; uploadedAt?: string }[]
+  >([]);
+  const [handoverProofFiles, setHandoverProofFiles] = useState<File[]>([]);
+  const [handoverProofNote, setHandoverProofNote] = useState("");
+  const [handoverProofs, setHandoverProofs] = useState<
+    { url?: string; description?: string; uploadedAt?: string }[]
+  >([]);
+  const [isUploadingHandoverProofs, setIsUploadingHandoverProofs] =
+    useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -234,6 +268,16 @@ const AppointmentManagement: React.FC = () => {
           ...apt,
           id: apt._id || apt.id,
           appointmentId: apt._id || apt.appointmentId,
+          notarizationProofs: Array.isArray(apt.notarizationProofs)
+            ? apt.notarizationProofs
+            : Array.isArray(apt.notarizationProof)
+            ? apt.notarizationProof
+            : Array.isArray(apt.proofs)
+            ? apt.proofs
+            : [],
+          handoverProofs: Array.isArray(apt.handoverProofs)
+            ? apt.handoverProofs
+            : [],
           buyer:
             apt.buyer ||
             (apt.buyerId
@@ -361,7 +405,9 @@ const AppointmentManagement: React.FC = () => {
   const appointmentTypeLabels: Record<string, string> = {
     VEHICLE_INSPECTION: "Xem xe",
     CONTRACT_SIGNING: "Ký hợp đồng",
+    CONTRACT_NOTARIZATION: "Công chứng hợp đồng",
     DELIVERY: "Bàn giao xe",
+    VEHICLE_HANDOVER: "Bàn giao xe",
   };
 
   const formatDate = (dateString: string) => {
@@ -421,10 +467,6 @@ const AppointmentManagement: React.FC = () => {
     return statusMatch && typeMatch;
   });
 
-  const toggleDropdown = (appointmentId: string) => {
-    setDropdownOpen(dropdownOpen === appointmentId ? null : appointmentId);
-  };
-
   const updateAppointmentStaff = (
     appointmentId: string,
     info: StaffInfo | null
@@ -459,6 +501,24 @@ const AppointmentManagement: React.FC = () => {
         completedByStaffEmail: info.email || prev.completedByStaffEmail,
         completedByStaffPhone: info.phone || prev.completedByStaffPhone,
       };
+    });
+  };
+
+  const applyUpdatedAppointment = (updated: Partial<Appointment>) => {
+    const updatedId = updated._id || updated.appointmentId || updated.id;
+    if (!updatedId) return;
+    setAppointments((prev) =>
+      prev.map((apt) => {
+        const id = apt._id || apt.appointmentId || apt.id;
+        if (id !== updatedId) return apt;
+        return { ...apt, ...updated };
+      })
+    );
+    setSelectedAppointment((prev) => {
+      if (!prev) return prev;
+      const id = prev._id || prev.appointmentId || prev.id;
+      if (id !== updatedId) return prev;
+      return { ...prev, ...updated };
     });
   };
 
@@ -497,6 +557,12 @@ const AppointmentManagement: React.FC = () => {
     );
 
     setSelectedAppointment(appointment);
+    setNotarizationProofFiles([]);
+    setNotarizationNote("");
+    setNotarizationProofs(appointment.notarizationProofs || []);
+    setHandoverProofFiles([]);
+    setHandoverProofNote("");
+    setHandoverProofs(appointment.handoverProofs || []);
     setIsModalOpen(true);
 
     void fetchStaffInfo(appointment._id || appointment.appointmentId);
@@ -539,6 +605,14 @@ const AppointmentManagement: React.FC = () => {
     setContractPhotos({ seller: [], buyer: [] });
     setPreviewFiles({ seller: [], buyer: [] });
     setCompletedContractPhotos([]);
+    setNotarizationProofFiles([]);
+    setNotarizationNote("");
+    setNotarizationProofs([]);
+    setIsUploadingNotarizationProofs(false);
+    setHandoverProofFiles([]);
+    setHandoverProofNote("");
+    setHandoverProofs([]);
+    setIsUploadingHandoverProofs(false);
   };
 
   const fetchContractPhotos = async (appointmentId: string) => {
@@ -969,6 +1043,237 @@ const AppointmentManagement: React.FC = () => {
   // Tạo preview URL từ File object
   const createPreviewUrl = (file: File): string => {
     return URL.createObjectURL(file);
+  };
+
+  const handleNotarizationProofFileSelect = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newFiles = Array.from(files);
+    const totalFiles = notarizationProofFiles.length + newFiles.length;
+
+    if (totalFiles > MAX_NOTARIZATION_PROOF_FILES) {
+      Swal.fire({
+        icon: "warning",
+        title: "Quá số lượng ảnh cho phép",
+        text: `Chỉ có thể chọn tối đa ${MAX_NOTARIZATION_PROOF_FILES} ảnh cho mỗi lần upload.`,
+        confirmButtonColor: "#2563eb",
+      });
+      e.target.value = "";
+      return;
+    }
+
+    setNotarizationProofFiles((prev) =>
+      [...prev, ...newFiles].slice(0, MAX_NOTARIZATION_PROOF_FILES)
+    );
+    e.target.value = "";
+  };
+
+  const handleRemoveNotarizationProofPreview = (index: number) => {
+    setNotarizationProofFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUploadNotarizationProofs = async () => {
+    if (!selectedAppointment) return;
+
+    if (notarizationProofFiles.length === 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Thiếu ảnh bằng chứng",
+        text: "Vui lòng chọn ít nhất 1 ảnh trước khi upload.",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+
+    const appointmentId =
+      selectedAppointment._id ||
+      selectedAppointment.appointmentId ||
+      selectedAppointment.id;
+
+    if (!appointmentId) {
+      Swal.fire({
+        icon: "error",
+        title: "Không tìm thấy lịch hẹn",
+        text: "Vui lòng thử lại sau.",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    notarizationProofFiles.forEach((file) => formData.append("photos", file));
+    if (notarizationNote.trim()) {
+      formData.append("note", notarizationNote.trim());
+    }
+
+    try {
+      setIsUploadingNotarizationProofs(true);
+      const response = await api.post(
+        `/appointments/${appointmentId}/notarization-proof`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
+
+      const proofsResponse =
+        response.data?.data?.proofs || response.data?.proofs || [];
+      const updatedProofs = Array.isArray(proofsResponse)
+        ? proofsResponse
+        : [];
+
+      setNotarizationProofs(updatedProofs);
+      setNotarizationProofFiles([]);
+      setNotarizationNote("");
+
+      Swal.fire({
+        icon: "success",
+        title: "Thành công",
+        text: response.data?.message || "Đã upload bằng chứng công chứng.",
+        confirmButtonColor: "#2563eb",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
+      applyUpdatedAppointment({
+        id: appointmentId,
+        appointmentId,
+        status: "COMPLETED",
+        notarizationProofs: updatedProofs,
+      });
+    } catch (error) {
+      console.error("Error uploading notarization proofs:", error);
+      const axiosError = error as {
+        response?: { data?: { message?: string } };
+      };
+      Swal.fire({
+        icon: "error",
+        title: "Upload thất bại",
+        text:
+          axiosError.response?.data?.message ||
+          "Không thể upload bằng chứng công chứng. Vui lòng thử lại.",
+        confirmButtonColor: "#2563eb",
+      });
+    } finally {
+      setIsUploadingNotarizationProofs(false);
+    }
+  };
+
+  const handleHandoverProofFileSelect = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newFiles = Array.from(files);
+    const totalFiles = handoverProofFiles.length + newFiles.length;
+
+    if (totalFiles > MAX_HANDOVER_PROOF_FILES) {
+      Swal.fire({
+        icon: "warning",
+        title: "Quá số lượng ảnh cho phép",
+        text: `Chỉ có thể chọn tối đa ${MAX_HANDOVER_PROOF_FILES} ảnh.`,
+        confirmButtonColor: "#2563eb",
+      });
+      e.target.value = "";
+      return;
+    }
+
+    setHandoverProofFiles((prev) =>
+      [...prev, ...newFiles].slice(0, MAX_HANDOVER_PROOF_FILES)
+    );
+    e.target.value = "";
+  };
+
+  const handleRemoveHandoverProofPreview = (index: number) => {
+    setHandoverProofFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUploadHandoverProofs = async () => {
+    if (!selectedAppointment) return;
+    const appointmentId =
+      selectedAppointment._id ||
+      selectedAppointment.appointmentId ||
+      selectedAppointment.id;
+
+    if (!appointmentId) {
+      Swal.fire({
+        icon: "error",
+        title: "Không tìm thấy lịch hẹn",
+        text: "Vui lòng thử lại sau.",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+
+    if (handoverProofFiles.length === 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Thiếu ảnh bằng chứng",
+        text: "Vui lòng chọn ít nhất 1 ảnh bàn giao.",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    handoverProofFiles.forEach((file) => formData.append("photos", file));
+    if (handoverProofNote.trim()) {
+      formData.append("note", handoverProofNote.trim());
+    }
+
+    try {
+      setIsUploadingHandoverProofs(true);
+      const response = await api.post(
+        `/appointments/${appointmentId}/handover-proof`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
+
+      const proofsResponse =
+        response.data?.data?.proofs || response.data?.proofs || [];
+      const updatedProofs = Array.isArray(proofsResponse)
+        ? proofsResponse
+        : [];
+
+      setHandoverProofs(updatedProofs);
+      setHandoverProofFiles([]);
+      setHandoverProofNote("");
+
+      applyUpdatedAppointment({
+        id: appointmentId,
+        appointmentId,
+        status: "COMPLETED",
+        handoverProofs: updatedProofs,
+      });
+
+      Swal.fire({
+        icon: "success",
+        title: "Đã upload bằng chứng bàn giao",
+        timer: 1800,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Error uploading handover proofs:", error);
+      const axiosError = error as {
+        response?: { data?: { message?: string } };
+      };
+      Swal.fire({
+        icon: "error",
+        title: "Upload thất bại",
+        text:
+          axiosError.response?.data?.message ||
+          "Không thể upload ảnh bàn giao. Vui lòng thử lại.",
+        confirmButtonColor: "#2563eb",
+      });
+    } finally {
+      setIsUploadingHandoverProofs(false);
+    }
   };
 
   const handleHoldVehicle = async () => {
@@ -1702,7 +2007,9 @@ const AppointmentManagement: React.FC = () => {
               <option value="all">Tất cả</option>
               <option value="VEHICLE_INSPECTION">Xem xe</option>
               <option value="CONTRACT_SIGNING">Ký hợp đồng</option>
+              <option value="CONTRACT_NOTARIZATION">Công chứng hợp đồng</option>
               <option value="DELIVERY">Bàn giao xe</option>
+              <option value="VEHICLE_HANDOVER">Bàn giao xe (Vehicle)</option>
             </select>
           </div>
 
@@ -1856,7 +2163,7 @@ const AppointmentManagement: React.FC = () => {
 
                         {appointment.status === "CONFIRMED" && (
                           <div className="relative dropdown-menu-container">
-                            <button
+                            {/* <button
                               onClick={() =>
                                 appointment.id && toggleDropdown(appointment.id)
                               }
@@ -1865,7 +2172,7 @@ const AppointmentManagement: React.FC = () => {
                               <FileText className="w-4 h-4 mr-1" />
                               In hợp đồng
                               <ChevronDown className="w-3 h-3 ml-1" />
-                            </button>
+                            </button> */}
 
                             {dropdownOpen === appointment.id && (
                               <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
@@ -2030,8 +2337,11 @@ const AppointmentManagement: React.FC = () => {
 
                 {renderConfirmationSection()}
 
-                {/* Hai bên */}
-                <div className="grid grid-cols-2 gap-6">
+                {selectedAppointment.type !== "CONTRACT_NOTARIZATION" &&
+                  selectedAppointment.type !== "VEHICLE_HANDOVER" && (
+                  <>
+                    {/* Hai bên */}
+                    <div className="grid grid-cols-2 gap-6">
                   {/* Bên Bán */}
                   <div>
                     <h3 className="text-lg font-semibold text-orange-700 mb-3">
@@ -2461,86 +2771,534 @@ const AppointmentManagement: React.FC = () => {
                       </div>
                     )}
                   </div>
-                </div>
-
-                {/* Nút Upload chung cho cả 2 bên */}
-                {["CONFIRMED", "COMPLETED"].includes(
-                  selectedAppointment.status ?? ""
-                ) &&
-                  (!contractPhotos.seller ||
-                    contractPhotos.seller.length < 3 ||
-                    !contractPhotos.buyer ||
-                    contractPhotos.buyer.length < 3) &&
-                  previewFiles.seller.length === 3 &&
-                  previewFiles.buyer.length === 3 && (
-                    <div className="mt-4">
-                      <button
-                        onClick={handleUploadBothSides}
-                        className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
-                      >
-                        Upload ảnh
-                      </button>
                     </div>
-                  )}
 
-                {/* Ảnh hợp đồng đã ký khi hoàn thành */}
-                {selectedAppointment.status === "COMPLETED" && (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                      Ảnh hợp đồng đã ký
-                    </h3>
-                    {completedContractPhotos.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        {completedContractPhotos.map((photo, index) => {
-                          const imageUrl = photo.startsWith("http")
-                            ? photo
-                            : `${api.defaults.baseURL || ""}${
-                                photo.startsWith("/") ? photo : "/" + photo
-                              }`;
-                          return (
-                            <div key={index} className="relative group">
-                              <div
-                                className="cursor-pointer"
-                                onClick={() =>
-                                  openImagePreview(
-                                    completedContractPhotos,
-                                    index
-                                  )
-                                }
-                              >
-                                <img
-                                  src={imageUrl}
-                                  alt={`Contract photo ${index + 1}`}
-                                  className="w-full h-40 object-cover rounded-lg border-2 border-gray-200 hover:border-blue-400 transition-colors"
-                                  onError={(e) => {
-                                    console.error(
-                                      "Error loading contract image:",
-                                      photo,
-                                      "Full URL:",
-                                      imageUrl
-                                    );
-                                    (e.target as HTMLImageElement).src =
-                                      "https://via.placeholder.com/300x200?text=Error";
-                                  }}
-                                />
-                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all pointer-events-none">
-                                  <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    {/* Nút Upload chung cho cả 2 bên */}
+                    {["CONFIRMED", "COMPLETED"].includes(
+                      selectedAppointment.status ?? ""
+                    ) &&
+                      (!contractPhotos.seller ||
+                        contractPhotos.seller.length < 3 ||
+                        !contractPhotos.buyer ||
+                        contractPhotos.buyer.length < 3) &&
+                      previewFiles.seller.length === 3 &&
+                      previewFiles.buyer.length === 3 && (
+                        <div className="mt-4">
+                          <button
+                            onClick={handleUploadBothSides}
+                            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
+                          >
+                            Upload ảnh
+                          </button>
+                        </div>
+                      )}
+
+                    {/* Ảnh hợp đồng đã ký khi hoàn thành */}
+                    {selectedAppointment.status === "COMPLETED" && (
+                      <div className="mt-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                          Ảnh hợp đồng đã ký
+                        </h3>
+                        {completedContractPhotos.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {completedContractPhotos.map((photo, index) => {
+                              const imageUrl = photo.startsWith("http")
+                                ? photo
+                                : `${api.defaults.baseURL || ""}${
+                                    photo.startsWith("/") ? photo : "/" + photo
+                                  }`;
+                              return (
+                                <div key={index} className="relative group">
+                                  <div
+                                    className="cursor-pointer"
+                                    onClick={() =>
+                                      openImagePreview(
+                                        completedContractPhotos,
+                                        index
+                                      )
+                                    }
+                                  >
+                                    <img
+                                      src={imageUrl}
+                                      alt={`Contract photo ${index + 1}`}
+                                      className="w-full h-40 object-cover rounded-lg border-2 border-gray-200 hover:border-blue-400 transition-colors"
+                                      onError={(e) => {
+                                        console.error(
+                                          "Error loading contract image:",
+                                          photo,
+                                          "Full URL:",
+                                          imageUrl
+                                        );
+                                        (e.target as HTMLImageElement).src =
+                                          "https://via.placeholder.com/300x200?text=Error";
+                                      }}
+                                    />
+                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all pointer-events-none">
+                                      <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-500">
-                        Không có ảnh hợp đồng.
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500">
+                            Không có ảnh hợp đồng.
+                          </div>
+                        )}
                       </div>
                     )}
+                  </>
+                )}
+
+                {["DELIVERY", "VEHICLE_HANDOVER"].includes(
+                  selectedAppointment.type || ""
+                ) && (
+                  <div className="mt-6 space-y-5">
+                    <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+                      {selectedAppointment.slotFinalized ||
+                      selectedAppointment.status === "CONFIRMED" ? (
+                        <div className="bg-green-50 border border-green-100 text-green-700 rounded-lg px-3 py-2 text-sm">
+                          Lịch bàn giao đã chốt:{" "}
+                          <strong>
+                            {selectedAppointment.selectedSlot
+                              ? formatDate(selectedAppointment.selectedSlot)
+                              : selectedAppointment.scheduledDate
+                              ? formatDate(selectedAppointment.scheduledDate)
+                              : "Đang cập nhật"}
+                          </strong>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-600">
+                          <p>
+                            Trạng thái:{" "}
+                            <span className="font-semibold">
+                              {selectedAppointment.buyerConfirmed &&
+                              selectedAppointment.sellerConfirmed
+                                ? "Đang chờ hệ thống chốt lịch"
+                                : selectedAppointment.buyerConfirmed
+                                ? "Đang chờ người bán xác nhận"
+                                : selectedAppointment.sellerConfirmed
+                                ? "Đang chờ người mua xác nhận"
+                                : "Đang chờ phản hồi từ hai bên"}
+                            </span>
+                          </p>
+                        </div>
+                      )}
+
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-2">
+                          Các khung giờ đã đề xuất
+                        </p>
+                      {selectedAppointment.proposedSlots &&
+                      selectedAppointment.proposedSlots.length > 0 ? (
+                          <div className="space-y-2">
+                            {selectedAppointment.proposedSlots.map((slot, idx) => (
+                              <div
+                                key={`${slot}-${idx}`}
+                                className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2 text-sm"
+                              >
+                                <span>{formatDate(slot)}</span>
+                                {selectedAppointment.selectedSlot === slot && (
+                                  <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                                    Đã chọn
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500">
+                            Chưa có khung giờ nào được gửi. Nhấn “Gửi lịch bàn giao” để
+                            bắt đầu.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="border border-indigo-100 rounded-lg p-4 space-y-4">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <h4 className="text-base font-semibold text-gray-900">
+                            Bằng chứng bàn giao
+                          </h4>
+                          <p className="text-sm text-gray-500">
+                            Ảnh/biên bản bàn giao dùng để kích hoạt payout cho người bán.
+                          </p>
+                        </div>
+                        <button
+                          onClick={handleUploadHandoverProofs}
+                          disabled={
+                            isUploadingHandoverProofs || handoverProofFiles.length === 0
+                          }
+                          className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                            isUploadingHandoverProofs || handoverProofFiles.length === 0
+                              ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                              : "bg-indigo-600 text-white hover:bg-indigo-700"
+                          }`}
+                        >
+                          {isUploadingHandoverProofs
+                            ? "Đang upload..."
+                            : "Upload bằng chứng bàn giao"}
+                        </button>
+                      </div>
+
+                      {handoverProofs.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                          {handoverProofs.map((proof, index) => {
+                            const rawUrl = proof?.url || "";
+                            const imageUrl = rawUrl.startsWith("http")
+                              ? rawUrl
+                              : rawUrl
+                              ? `${api.defaults.baseURL || ""}${
+                                  rawUrl.startsWith("/") ? rawUrl : "/" + rawUrl
+                                }`
+                              : "";
+                            return (
+                              <div key={`handover-proof-${index}`} className="border border-gray-100 rounded-lg overflow-hidden bg-white shadow-sm">
+                                <div
+                                  className="relative h-40 bg-gray-100 cursor-pointer group"
+                                  onClick={() => {
+                                    if (!imageUrl) return;
+                                    const gallery = handoverProofs
+                                      .map((item) => item.url || "")
+                                      .filter(Boolean)
+                                      .map((url) =>
+                                        url.startsWith("http")
+                                          ? url
+                                          : `${api.defaults.baseURL || ""}${
+                                              url.startsWith("/") ? url : "/" + url
+                                            }`
+                                      );
+                                    if (!gallery.length) return;
+                                    openImagePreview(gallery, index);
+                                  }}
+                                >
+                                  {imageUrl ? (
+                                    <img
+                                      src={imageUrl}
+                                      alt={`Handover proof ${index + 1}`}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src =
+                                          "https://via.placeholder.com/300x200?text=Error";
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                                      Không có ảnh
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center pointer-events-none">
+                                    <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </div>
+                                <div className="p-3 border-t border-gray-100">
+                                  <p className="text-sm text-gray-800">
+                                    {proof?.description || "Không có ghi chú"}
+                                  </p>
+                                  {proof?.uploadedAt && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      {formatDate(proof.uploadedAt)}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">
+                          Chưa có bằng chứng bàn giao nào. Upload ảnh sau khi bàn giao để
+                          hệ thống tự động payout cho người bán.
+                        </p>
+                      )}
+
+                      {handoverProofFiles.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-2">
+                            Ảnh đã chọn ({handoverProofFiles.length}/
+                            {MAX_HANDOVER_PROOF_FILES})
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            {handoverProofFiles.map((file, index) => {
+                              const previewUrl = createPreviewUrl(file);
+                              return (
+                                <div key={index} className="relative group">
+                                  <div
+                                    className="cursor-pointer"
+                                    onClick={() => {
+                                      const previews = handoverProofFiles.map((f) =>
+                                        createPreviewUrl(f)
+                                      );
+                                      setPreviewImages(previews);
+                                      setPreviewIndex(index);
+                                      setIsPreviewOpen(true);
+                                    }}
+                                  >
+                                    <img
+                                      src={previewUrl}
+                                      alt={`Handover preview ${index + 1}`}
+                                      className="w-full h-28 object-cover rounded-lg border-2 border-indigo-200"
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 rounded-lg flex items-center justify-center pointer-events-none transition-all">
+                                      <ImageIcon className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveHandoverProofPreview(index);
+                                      URL.revokeObjectURL(previewUrl);
+                                    }}
+                                    className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="border-2 border-dashed border-indigo-200 rounded-lg p-4 bg-indigo-50/50">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleHandoverProofFileSelect}
+                          className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Tối đa {MAX_HANDOVER_PROOF_FILES} ảnh bàn giao (cavet, chìa khoá,
+                          tình trạng xe...).
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Ghi chú (tuỳ chọn)
+                        </label>
+                        <textarea
+                          value={handoverProofNote}
+                          onChange={(e) => setHandoverProofNote(e.target.value)}
+                          rows={3}
+                          className="mt-2 w-full rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                          placeholder="Ví dụ: Đã bàn giao đủ giấy tờ, xe sạch sẽ..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedAppointment.type === "CONTRACT_NOTARIZATION" && (
+                  <div className="mt-6">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Bằng chứng công chứng
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          Upload 1–10 ảnh biên bản, giấy xác nhận đã công chứng.
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleUploadNotarizationProofs}
+                        disabled={
+                          isUploadingNotarizationProofs ||
+                          notarizationProofFiles.length === 0
+                        }
+                        className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                          isUploadingNotarizationProofs ||
+                          notarizationProofFiles.length === 0
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            : "bg-indigo-600 text-white hover:bg-indigo-700"
+                        }`}
+                      >
+                        {isUploadingNotarizationProofs
+                          ? "Đang upload..."
+                          : "Upload bằng chứng công chứng"}
+                      </button>
+                    </div>
+
+                    <div className="mt-4">
+                      {notarizationProofs.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                          {notarizationProofs.map((proof, index) => {
+                            const rawUrl = proof?.url || "";
+                            const imageUrl = rawUrl.startsWith("http")
+                              ? rawUrl
+                              : rawUrl
+                              ? `${api.defaults.baseURL || ""}${
+                                  rawUrl.startsWith("/") ? rawUrl : "/" + rawUrl
+                                }`
+                              : "";
+                            return (
+                              <div
+                                key={`proof-${index}`}
+                                className="border border-indigo-100 rounded-lg overflow-hidden bg-white shadow-sm"
+                              >
+                                <div
+                                  className="relative h-44 bg-gray-100 cursor-pointer group"
+                                  onClick={() => {
+                                    const proofUrls = notarizationProofs.map(
+                                      (item) => {
+                                        const itemUrl = item?.url || "";
+                                        if (!itemUrl) return "";
+                                        return itemUrl.startsWith("http")
+                                          ? itemUrl
+                                          : `${api.defaults.baseURL || ""}${
+                                              itemUrl.startsWith("/")
+                                                ? itemUrl
+                                                : "/" + itemUrl
+                                            }`;
+                                      }
+                                    );
+                                    if (!proofUrls[index]) return;
+                                    openImagePreview(proofUrls, index);
+                                  }}
+                                >
+                                  {imageUrl ? (
+                                    <img
+                                      src={imageUrl}
+                                      alt={`Notarization proof ${index + 1}`}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        console.error(
+                                          "Error loading proof image:",
+                                          rawUrl,
+                                          "Full URL:",
+                                          imageUrl
+                                        );
+                                        (e.target as HTMLImageElement).src =
+                                          "https://via.placeholder.com/300x200?text=Error";
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                                      Không có ảnh
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center pointer-events-none">
+                                    <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </div>
+                                <div className="p-3 border-t border-gray-100">
+                                  <p className="text-sm text-gray-800">
+                                    {proof?.description ||
+                                      "Không có ghi chú"}
+                                  </p>
+                                  {proof?.uploadedAt && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      {formatDate(proof.uploadedAt)}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center text-sm text-gray-500 bg-gray-50">
+                          Chưa có bằng chứng công chứng nào. Vui lòng upload để
+                          cập nhật tiến độ.
+                        </div>
+                      )}
+                    </div>
+
+                    {notarizationProofFiles.length > 0 && (
+                      <div className="mt-5">
+                        <p className="text-sm font-medium text-gray-700 mb-2">
+                          Ảnh đã chọn ({notarizationProofFiles.length}/
+                          {MAX_NOTARIZATION_PROOF_FILES})
+                        </p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                          {notarizationProofFiles.map((file, index) => {
+                            const previewUrl = createPreviewUrl(file);
+                            return (
+                              <div key={index} className="relative group">
+                                <div
+                                  className="cursor-pointer"
+                                  onClick={() => {
+                                    const previewUrls =
+                                      notarizationProofFiles.map((f) =>
+                                        createPreviewUrl(f)
+                                      );
+                                    setPreviewImages(previewUrls);
+                                    setPreviewIndex(index);
+                                    setIsPreviewOpen(true);
+                                  }}
+                                >
+                                  <img
+                                    src={previewUrl}
+                                    alt={`Preview proof ${index + 1}`}
+                                    className="w-full h-32 object-cover rounded-lg border-2 border-indigo-200 hover:border-indigo-400 transition-colors"
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 rounded-lg flex items-center justify-center pointer-events-none transition-all">
+                                    <ImageIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveNotarizationProofPreview(index);
+                                    URL.revokeObjectURL(previewUrl);
+                                  }}
+                                  className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                                  title="Xóa ảnh này"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-5">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Chọn ảnh bằng chứng
+                      </label>
+                      <div className="mt-2 border-2 border-dashed border-indigo-300 rounded-lg p-4 bg-indigo-50/50">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleNotarizationProofFileSelect}
+                          className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
+                        />
+                        <p className="text-xs text-gray-500 mt-2">
+                          Tên file rõ ràng (ví dụ: bien-ban-1.jpg). Cho phép tối
+                          đa {MAX_NOTARIZATION_PROOF_FILES} ảnh mỗi lần upload.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5">
+                      <label
+                        htmlFor="notarization-note"
+                        className="block text-sm font-medium text-gray-700"
+                      >
+                        Ghi chú (tuỳ chọn)
+                      </label>
+                      <textarea
+                        id="notarization-note"
+                        value={notarizationNote}
+                        onChange={(e) => setNotarizationNote(e.target.value)}
+                        rows={3}
+                        className="mt-2 w-full rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        placeholder="Ví dụ: Biên bản đã ký tại VP Công chứng Trung Tâm"
+                      />
+                    </div>
                   </div>
                 )}
 
                 {/* Buttons: Giữ xe và Mua ngay */}
-                {selectedAppointment.status === "CONFIRMED" && (
+                {selectedAppointment.type !== "CONTRACT_NOTARIZATION" &&
+                  selectedAppointment.type !== "VEHICLE_HANDOVER" &&
+                  selectedAppointment.status === "CONFIRMED" && (
                   <div className="mt-6 flex items-center justify-center gap-3">
                     <button
                       onClick={handleHoldVehicle}

@@ -26,7 +26,7 @@ import ProtectedRoute from "./components/Common/ProtectedRoute";
 import StaffRedirect from "./components/Common/StaffRedirect";
 import ScrollToTop from "./components/ScrollToTop/scrollToTop";
 import "./utils/websocketDebug"; // Load debug tools
-
+import DealManagement from "./pages/Staff/DealManagement";
 // 🔽 thêm 3 import cho phần đấu giá
 import AuctionListPage from "./pages/Auction/AuctionListPage";
 import AuctionDetailPage from "./pages/Auction/AuctionDetailPage";
@@ -74,6 +74,14 @@ function App() {
             element={
               <ProtectedRoute requiredRole="staff">
                 <StaffAuctionManagementPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff/deal-management"
+            element={
+              <ProtectedRoute requiredRole="staff">
+                <DealManagement />
               </ProtectedRoute>
             }
           />

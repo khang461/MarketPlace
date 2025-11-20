@@ -101,14 +101,25 @@ if (typeof document !== 'undefined') {
 interface Notification {
   _id: string;
   userId: string;
-  type: 'deposit' | 'deposit_confirmation' | 'contract' | 'transaction_complete'| 'appointment_created' | 'appointment_rejected';
+  type:
+    | 'deposit'
+    | 'deposit_confirmation'
+    | 'contract'
+    | 'transaction_complete'
+    | 'appointment_created'
+    | 'appointment_rejected'
+    | 'notarization_request';
   title: string;
   message: string;
   depositId?: string;
   contractId?: string;
   transactionId?: string;
+  appointmentId?: string;
   metadata?: {
     listingId?: string;
+    listingBrand?: string;
+    listingModel?: string;
+    listingYear?: number;
     amount?: number;
     status?: string;
     buyerId?: string;
@@ -116,16 +127,25 @@ interface Notification {
     sellerId?: string;
     sellerName?: string;
     appointmentId?: string;
+    dealId?: string;
     staffId?: string;
     staffName?: string;
     depositRequestId?: string;
+    proposedSlots?: string[];
+    location?: string;
+    notes?: string;
+    selectedSlot?: string;
+    buyerSlotChoice?: string;
+    sellerSlotChoice?: string;
+    otherPartyId?: string;
+    otherPartyName?: string;
   };
   createdAt: string;
   isAccepted?: boolean; // Thêm field để track trạng thái đã chấp nhận
 }
 
 const NotificationDepositPage: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -134,6 +154,15 @@ const NotificationDepositPage: React.FC = () => {
   const [creatingApptById, setCreatingApptById] = useState<Record<string, boolean>>({});
   const [acceptingApptById, setAcceptingApptById] = useState<Record<string, boolean>>({});
   const [rejectingApptById, setRejectingApptById] = useState<Record<string, boolean>>({});
+  const [selectingSlotById, setSelectingSlotById] = useState<Record<string, string | null>>({});
+
+  const getAuthUserId = () => {
+    if (!user) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const candidate = user as any;
+    return candidate?.id || candidate?._id || null;
+  };
+  const authUserId = getAuthUserId();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -201,8 +230,106 @@ const NotificationDepositPage: React.FC = () => {
         return '📅';
       case 'appointment_rejected':
         return '❌';
+      case 'notarization_request':
+        return '🖋️';
+      case 'handover_request':
+        return '🚗';
       default:
         return '🔔';
+    }
+  };
+
+  const formatSlot = (slot: string) => {
+    if (!slot) return '—';
+    const date = new Date(slot);
+    return date.toLocaleString('vi-VN', {
+      weekday: 'short',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const handleSelectSlot = async (
+    e: React.MouseEvent,
+    notification: Notification,
+    slot: string
+  ) => {
+    e.stopPropagation();
+    const appointmentId =
+      notification.metadata?.appointmentId || notification.appointmentId;
+
+    if (!appointmentId) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi!',
+        text: 'Không tìm thấy thông tin cuộc hẹn công chứng.',
+        confirmButtonColor: '#2563eb',
+      });
+      return;
+    }
+
+    const confirm = await Swal.fire({
+      title: 'Xác nhận khung giờ?',
+      text: `Bạn chọn ${formatSlot(slot)} cho buổi công chứng.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Xác nhận',
+      cancelButtonText: 'Hủy',
+      confirmButtonColor: '#2563eb',
+      cancelButtonColor: '#6b7280',
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    if (selectingSlotById[notification._id] === slot) return;
+    setSelectingSlotById((prev) => ({ ...prev, [notification._id]: slot }));
+
+    try {
+      const response = await api.post(
+        `/appointments/${appointmentId}/select-slot`,
+        { slot }
+      );
+
+      if (response.data.success) {
+        await fetchNotifications();
+        Swal.fire({
+          icon: 'success',
+          title: 'Thành công!',
+          text:
+            response.data.message ||
+            'Đã ghi nhận lựa chọn của bạn. Vui lòng chờ phía đối tác xác nhận.',
+          confirmButtonColor: '#2563eb',
+        });
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: 'Lỗi!',
+          text:
+            response.data.message ||
+            'Không thể gửi lựa chọn. Vui lòng thử lại.',
+          confirmButtonColor: '#2563eb',
+        });
+      }
+    } catch (error) {
+      console.error('Error selecting notarization slot:', error);
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi hệ thống!',
+        text:
+          axiosError.response?.data?.message ||
+          'Không thể gửi lựa chọn. Vui lòng thử lại sau.',
+        confirmButtonColor: '#2563eb',
+      });
+    } finally {
+      setSelectingSlotById((prev) => {
+        const next = { ...prev };
+        delete next[notification._id];
+        return next;
+      });
     }
   };
 
@@ -1045,6 +1172,165 @@ const NotificationDepositPage: React.FC = () => {
                         </button>
                       </div>
                     )}
+
+                    {/* Notarization request */}
+                    {['notarization_request', 'handover_request'].includes(notification.type) &&
+                      notification.metadata &&
+                      (() => {
+                        const viewerId = authUserId || notification.userId;
+                        const isViewerBuyer =
+                          viewerId &&
+                          notification.metadata?.buyerId &&
+                          notification.metadata?.buyerId === viewerId;
+                        const isViewerSeller =
+                          viewerId &&
+                          notification.metadata?.sellerId &&
+                          notification.metadata?.sellerId === viewerId;
+
+                        const buyerBadgeLabel = isViewerBuyer ? 'Bạn' : 'Bên mua';
+                        const sellerBadgeLabel = isViewerSeller ? 'Bạn' : 'Bên bán';
+
+                        return (
+                          <div className="mt-3 space-y-3 border border-blue-100 rounded-lg p-3 bg-blue-50/40">
+                            <div className="text-sm text-gray-700">
+                              <p>
+                                <strong>Địa điểm:</strong>{' '}
+                                {notification.metadata.location ||
+                                  'Văn phòng công chứng'}
+                              </p>
+                              {notification.metadata.otherPartyName && (
+                                <p>
+                                  <strong>Bên còn lại:</strong>{' '}
+                                  {notification.metadata.otherPartyName}
+                                </p>
+                              )}
+                              {notification.metadata.listingBrand && (
+                                <p className="text-xs text-gray-500">
+                                  Xe:{' '}
+                                  {[
+                                    notification.metadata.listingBrand,
+                                    notification.metadata.listingModel,
+                                    notification.metadata.listingYear,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' ')}
+                                </p>
+                              )}
+                            </div>
+
+                            {notification.metadata.selectedSlot ? (
+                              <div className="text-sm text-green-600 font-medium bg-white rounded-lg px-3 py-2 border border-green-200">
+                                Lịch đã chốt:{' '}
+                                {formatSlot(notification.metadata.selectedSlot)}
+                              </div>
+                            ) : (
+                              <>
+                                {notification.metadata.buyerSlotChoice && (
+                                  <p className="text-xs text-gray-600">
+                                    {buyerBadgeLabel === 'Bạn'
+                                      ? 'Bạn đã chọn'
+                                      : 'Bên mua đã chọn'}{' '}
+                                    {formatSlot(
+                                      notification.metadata.buyerSlotChoice
+                                    )}
+                                  </p>
+                                )}
+                                {notification.metadata.sellerSlotChoice && (
+                                  <p className="text-xs text-gray-600">
+                                    {sellerBadgeLabel === 'Bạn'
+                                      ? 'Bạn đã chọn'
+                                      : 'Bên bán đã chọn'}{' '}
+                                    {formatSlot(
+                                      notification.metadata.sellerSlotChoice
+                                    )}
+                                  </p>
+                                )}
+                                <div className="space-y-2">
+                                  <p className="text-sm font-medium text-gray-800">
+                                    Chọn khung giờ:
+                                  </p>
+                                  {notification.metadata.proposedSlots?.length ? (
+                                    notification.metadata.proposedSlots.map(
+                                      (slot) => {
+                                        const buyerSelected =
+                                          notification.metadata
+                                            ?.buyerSlotChoice === slot;
+                                        const sellerSelected =
+                                          notification.metadata
+                                            ?.sellerSlotChoice === slot;
+                                        const isMySelection =
+                                          (isViewerBuyer && buyerSelected) ||
+                                          (isViewerSeller && sellerSelected);
+
+                                        return (
+                                          <button
+                                            key={slot}
+                                            onClick={(e) =>
+                                              handleSelectSlot(e, notification, slot)
+                                            }
+                                            disabled={
+                                              Boolean(
+                                                selectingSlotById[
+                                                  notification._id
+                                                ]
+                                              ) ||
+                                              Boolean(
+                                                notification.metadata
+                                                  ?.selectedSlot
+                                              )
+                                            }
+                                            className={`w-full text-sm px-3 py-2 rounded-lg border transition-colors flex items-center justify-between gap-2 ${
+                                              selectingSlotById[
+                                                notification._id
+                                              ] === slot
+                                                ? 'bg-blue-600 text-white border-blue-600 cursor-wait'
+                                                : isMySelection
+                                                ? 'bg-blue-50 border-blue-500 text-blue-900'
+                                                : buyerSelected || sellerSelected
+                                                ? 'bg-green-50 border-green-200 text-gray-900'
+                                                : 'bg-white text-gray-800 border-gray-200 hover:bg-blue-50'
+                                            }`}
+                                          >
+                                            <span>{formatSlot(slot)}</span>
+                                            <div className="flex gap-1">
+                                              {buyerSelected && (
+                                                <span
+                                                  className={`text-[10px] px-2 py-0.5 rounded-full ${
+                                                    isViewerBuyer
+                                                      ? 'bg-blue-600 text-white'
+                                                      : 'bg-gray-200 text-gray-700'
+                                                  }`}
+                                                >
+                                                  {buyerBadgeLabel}
+                                                </span>
+                                              )}
+                                              {sellerSelected && (
+                                                <span
+                                                  className={`text-[10px] px-2 py-0.5 rounded-full ${
+                                                    isViewerSeller
+                                                      ? 'bg-blue-600 text-white'
+                                                      : 'bg-gray-200 text-gray-700'
+                                                  }`}
+                                                >
+                                                  {sellerBadgeLabel}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </button>
+                                        );
+                                      }
+                                    )
+                                  ) : (
+                                    <p className="text-sm text-gray-500">
+                                      Chưa có thời gian đề xuất.
+                                    </p>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                   </div>
 
                 </div>
