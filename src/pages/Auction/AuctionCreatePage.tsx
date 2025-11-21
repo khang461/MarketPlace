@@ -323,21 +323,7 @@ export default function AuctionCreatePage() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Tiền cọc (₫){" "}
-              <span className="text-gray-400">(không gửi khi tạo phiên)</span>
-            </label>
-            <input
-              type="number"
-              min={0}
-              step={1000}
-              name="depositAmount"
-              value={form.depositAmount}
-              onChange={onChange}
-              className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
+          
         </div>
 
         <div className="flex items-center justify-between gap-3">

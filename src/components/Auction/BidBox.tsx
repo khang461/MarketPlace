@@ -36,14 +36,13 @@ const BidBox = memo(function BidBox({
   const userId =
     (user as any)?._id || (user as any)?.id || (user as any)?.userId;
 
-  const { bidAuctionWs, onAuctionBidUpdate, onAuctionBidResult, off } =
+  const { bidAuctionWs, onAuctionBidUpdate, onAuctionBidResult, off, isConnected } =
     useSocket();
   const [amount, setAmount] = useState<number>(0);
   const [inputValue, setInputValue] = useState<string>(""); // Separate input value for better UX
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string>("");
   const [hasDeposit, setHasDeposit] = useState<boolean>(false);
-  const [lastBidUserId, setLastBidUserId] = useState<string | null>(null);
   const [canBidAgain, setCanBidAgain] = useState<boolean>(true);
 
   // ✅ Dùng API đã normalize
@@ -78,6 +77,16 @@ const BidBox = memo(function BidBox({
     }
   };
 
+  // Quick preset increments (in VND)
+  const PRESETS = [1_000_000, 2_000_000, 5_000_000, 10_000_000];
+  const applyPreset = (inc: number) => {
+    // Use the current amount as the base if it's already >= minNext, otherwise start from minNext.
+    const base = (typeof amount === "number" && amount >= minNext) ? amount : minNext;
+    const v = base + inc;
+    setAmount(v);
+    setInputValue(String(v));
+  };
+
   useEffect(() => {
     if (isSeller) return;
     if (!onAuctionBidUpdate || !onAuctionBidResult) return;
@@ -89,7 +98,6 @@ const BidBox = memo(function BidBox({
 
       // Lấy userId từ bid mới nhất
       const newBidUserId = p.bid?.userId?._id || p.bid?.userId || p.userId;
-      setLastBidUserId(newBidUserId);
 
       // Nếu bid mới không phải của user hiện tại, cho phép bid lại
       if (newBidUserId && userId && String(newBidUserId) !== String(userId)) {
@@ -109,7 +117,6 @@ const BidBox = memo(function BidBox({
       } else if (r?.success) {
         // Bid thành công - disable cho đến khi có người khác bid
         setCanBidAgain(false);
-        setLastBidUserId(userId);
         setBusy(false);
       }
     };
@@ -191,27 +198,25 @@ const BidBox = memo(function BidBox({
     onAfterBid?.(optimisticBid);
 
     try {
-      // Gọi API placeBid
-      const response = await placeBid(auction._id, v);
-
-      // API success - cập nhật với data thật từ server
-      if (response?.data?.bid) {
-        onAfterBid?.(response.data.bid);
+      if (isConnected && bidAuctionWs) {
+        // Prefer websocket when available so server broadcasts to other clients
+        bidAuctionWs(auction._id, v);
+        // onAuctionBidResult/onAuctionBidUpdate handlers will update UI and clear busy
+      } else {
+        // Fallback to HTTP API
+        const response = await placeBid(auction._id, v);
+        if (response?.data?.bid) {
+          onAfterBid?.(response.data.bid);
+        }
+        setCanBidAgain(false);
+        setMsg("");
+        setBusy(false);
       }
-
-      // Đánh dấu user đã bid, chờ người khác
-      setCanBidAgain(false);
-      setLastBidUserId(userId);
-      setMsg("");
-      setBusy(false);
     } catch (error: any) {
       const errorMsg =
         error?.response?.data?.message || error?.message || "Đặt giá thất bại";
       setMsg(errorMsg);
       setBusy(false);
-
-      // Rollback optimistic update nếu có lỗi
-      // Parent component sẽ nhận được WebSocket update từ server
     }
   };
 
@@ -270,6 +275,29 @@ const BidBox = memo(function BidBox({
           <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">
             đ
           </span>
+          {/* Preset buttons */}
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => applyPreset(0)}
+              disabled={hardDisabled || busy}
+              className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+            >
+              Min
+            </button>
+            {PRESETS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => applyPreset(p)}
+                disabled={hardDisabled || busy}
+                className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+              >
+                +{(p / 1_000_000).toLocaleString("vi-VN")}tr
+              </button>
+            ))}
+            <div className="text-xs text-gray-400 ml-2">Nhanh chóng chọn bước đặt giá</div>
+          </div>
         </div>
         <button
           onClick={submit}
