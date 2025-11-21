@@ -121,7 +121,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
   const joinedAuctionsRef = useRef<Set<string>>(new Set());
   const joinedChatsRef = useRef<Set<string>>(new Set());
   const WS_URL = useMemo(
-    () => import.meta.env.VITE_WS_URL || "http://localhost:8081",
+    () =>
+      import.meta.env.VITE_WS_URL ||
+      "https://be-second-hand-ev-platform.onrender.com",
     []
   );
 

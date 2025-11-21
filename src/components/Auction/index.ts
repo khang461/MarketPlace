@@ -4,4 +4,3 @@ export { default as BidBox } from "./BidBox";
 export { default as AuctionHistory } from "./AuctionHistory";
 export { default as AuctionCard } from "./AuctionCard";
 export { default as CreateAppointmentButton } from "./CreateAppointmentButton";
-export { default as EndAuctionButton } from "./EndAuctionButton";
