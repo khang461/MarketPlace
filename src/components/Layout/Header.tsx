@@ -54,6 +54,46 @@ const Header: React.FC = () => {
   const location = useLocation();
   const { isAuthenticated, user, logout } = useAuth();
 
+  // Khi click vào Đấu giá: kiểm tra eKYC nếu đã đăng nhập
+  const handleAuctionClick = async (closeMobileMenu?: () => void) => {
+    if (!isAuthenticated) {
+      navigate("/signin");
+      if (closeMobileMenu) closeMobileMenu();
+      return;
+    }
+
+    try {
+      const resp = await api.get("/profiles");
+      const ekycStatus = resp?.data?.ekycStatus || resp?.data?.ekyc?.status;
+
+      if (ekycStatus === "verified") {
+        navigate("/auctions");
+        if (closeMobileMenu) closeMobileMenu();
+        return;
+      }
+
+      // Nếu chưa verified -> yêu cầu người dùng đi xác minh
+      Swal.fire({
+        title: "Yêu cầu xác minh eKYC",
+        text: "Bạn cần hoàn tất eKYC trước khi truy cập trang Đấu giá.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Bắt đầu xác minh eKYC",
+        cancelButtonText: "Hủy",
+        confirmButtonColor: "#2563eb",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          navigate("/ekyc");
+        }
+      });
+    } catch (error) {
+      console.error("Error checking profile for eKYC:", error);
+      // Nếu có lỗi khi fetch, vẫn cho vào hoặc yêu cầu reload — ở đây chuyển tới /auctions để tránh chặn nhầm
+      navigate("/auctions");
+      if (closeMobileMenu) closeMobileMenu();
+    }
+  };
+
   // Reset search query khi chuyển trang (trừ trang search)
   useEffect(() => {
     if (!location.pathname.startsWith("/search")) {
@@ -410,14 +450,14 @@ const Header: React.FC = () => {
               Tìm kiếm
             </Link>
 
-            {/* ✅ NEW: Đấu giá */}
-            <Link
-              to="/auctions"
-              className="text-gray-700 hover:text-blue-600 font-medium flex items-center space-x-2"
+            {/* ✅ NEW: Đấu giá (kiểm tra eKYC trước khi vào) */}
+            <button
+              onClick={() => handleAuctionClick()}
+              className="text-gray-700 hover:text-blue-600 font-medium flex items-center space-x-2 bg-transparent border-0"
             >
               <Gavel className="w-4 h-4" />
               <span>Đấu giá</span>
-            </Link>
+            </button>
 
             <Link
               to="/post-listing"
@@ -561,15 +601,17 @@ const Header: React.FC = () => {
                 Tìm kiếm
               </Link>
 
-              {/* ✅ NEW: Đấu giá */}
-              <Link
-                to="/auctions"
-                className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg flex items-center space-x-2"
-                onClick={() => setIsMenuOpen(false)}
+              {/* ✅ NEW: Đấu giá (kiểm tra eKYC trước khi vào) */}
+              <button
+                className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg flex items-center space-x-2 w-full text-left bg-transparent border-0"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  handleAuctionClick(() => setIsMenuOpen(false));
+                }}
               >
                 <Gavel className="w-4 h-4" />
                 <span>Đấu giá</span>
-              </Link>
+              </button>
 
               <Link
                 to="/post-listing"
