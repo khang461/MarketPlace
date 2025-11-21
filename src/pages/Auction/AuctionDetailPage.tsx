@@ -9,7 +9,6 @@ import {
   DepositButton,
   BidBox,
   AuctionHistory,
-  EndAuctionButton,
 } from "../../components/Auction";
 import CreateAppointmentButton from "../../components/Auction/CreateAppointmentButton";
 import { useSocket } from "../../contexts/SocketContext";
@@ -880,14 +879,6 @@ export default function AuctionDetailPage() {
               <div className="p-3 rounded-md bg-amber-50 text-amber-700 text-sm">
                 Bạn là <b>người đăng bán</b> cho phiên này.
               </div>
-
-              {!isEnded && uiStatus === "RUNNING" && (
-                <EndAuctionButton
-                  auctionId={auction._id}
-                  currentBidCount={auction.bids?.length || 0}
-                  onAuctionEnded={load}
-                />
-              )}
 
               {isEnded && (
                 <div className="p-3 rounded-md bg-gray-50 text-gray-700 text-sm">
