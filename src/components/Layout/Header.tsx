@@ -531,7 +531,7 @@ const Header: React.FC = () => {
                     className="px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center space-x-2 relative"
                   >
                     <FileText className="w-4 h-4" />
-                    <span>Yêu cầu đặt cọc</span>
+                    <span>Lịch cho giấy tờ</span>
                     {unreadNotifications > 0 && (
                       <span className="ml-auto bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                         {unreadNotifications > 99 ? "99+" : unreadNotifications}

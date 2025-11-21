@@ -1,8 +1,8 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:8081/api",
-  // baseURL: "http://14.225.207.153:8081/api",
+  // baseURL: "http://localhost:8081/api",
+  baseURL: "https://be-second-hand-ev-platform.onrender.com/api",
 });
 
 // REQUEST INTERCEPTOR
