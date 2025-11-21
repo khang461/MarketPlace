@@ -30,6 +30,7 @@ export interface Appointment {
   location: string;
   status:
     | "PENDING"
+    | "PENDING_CONFIRMATION"
     | "CONFIRMED"
     | "COMPLETED"
     | "CANCELLED"
@@ -1139,14 +1140,14 @@ const AppointmentManagement: React.FC = () => {
       setNotarizationProofFiles([]);
       setNotarizationNote("");
 
-        Swal.fire({
-          icon: "success",
+      Swal.fire({
+        icon: "success",
         title: "Thành công",
         text: response.data?.message || "Đã upload bằng chứng công chứng.",
-          confirmButtonColor: "#2563eb",
+        confirmButtonColor: "#2563eb",
         timer: 1500,
-          showConfirmButton: false,
-        });
+        showConfirmButton: false,
+      });
 
       applyUpdatedAppointment({
         id: appointmentId,
@@ -1159,14 +1160,14 @@ const AppointmentManagement: React.FC = () => {
       const axiosError = error as {
         response?: { data?: { message?: string } };
       };
-        Swal.fire({
-          icon: "error",
+      Swal.fire({
+        icon: "error",
         title: "Upload thất bại",
-          text:
+        text:
           axiosError.response?.data?.message ||
           "Không thể upload bằng chứng công chứng. Vui lòng thử lại.",
-          confirmButtonColor: "#2563eb",
-        });
+        confirmButtonColor: "#2563eb",
+      });
     } finally {
       setIsUploadingNotarizationProofs(false);
     }
@@ -1379,7 +1380,7 @@ const AppointmentManagement: React.FC = () => {
       Swal.fire({
         icon: "error",
         title: "Lỗi thanh toán",
-      html: `
+        html: `
           <div class="text-left">
             <p class="mb-2">${displayMessage}</p>
             ${
@@ -1549,6 +1550,124 @@ const AppointmentManagement: React.FC = () => {
             <p class="text-xs text-gray-400 mt-3">Nếu lỗi vẫn tiếp tục, vui lòng liên hệ bộ phận hỗ trợ.</p>
           </div>
         `,
+        confirmButtonColor: "#2563eb",
+      });
+    }
+  };
+
+  // Hàm xử lý complete appointment cho AUCTION type
+  const handleCompleteAppointment = async (appointment: Appointment) => {
+    const appointmentId =
+      appointment._id || appointment.appointmentId || appointment.id;
+
+    if (!appointmentId) {
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi",
+        text: "Không tìm thấy ID lịch hẹn",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+
+    // Kiểm tra appointment type phải là AUCTION
+    if (appointment.appointmentType !== "AUCTION") {
+      Swal.fire({
+        icon: "warning",
+        title: "Cảnh báo",
+        text: "Chỉ có thể hoàn thành lịch hẹn đấu giá",
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+
+    // Kiểm tra status hợp lệ (PENDING, PENDING_CONFIRMATION hoặc CONFIRMED)
+    const validStatuses = ["PENDING", "PENDING_CONFIRMATION", "CONFIRMED"];
+    if (!validStatuses.includes(appointment.status)) {
+      Swal.fire({
+        icon: "warning",
+        title: "Cảnh báo",
+        text: `Không thể hoàn thành lịch hẹn với trạng thái ${appointment.status}`,
+        confirmButtonColor: "#2563eb",
+      });
+      return;
+    }
+
+    // Xác nhận trước khi complete
+    const result = await Swal.fire({
+      icon: "question",
+      title: "Xác nhận hoàn thành",
+      html: `
+        <div class="text-left">
+          <p class="mb-2">Bạn có chắc chắn muốn đánh dấu lịch hẹn này là đã hoàn thành?</p>
+          <p class="text-sm text-gray-600">ID: <strong>${appointmentId}</strong></p>
+          <p class="text-sm text-gray-600">Loại: <strong>Đấu giá</strong></p>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "Xác nhận",
+      cancelButtonText: "Hủy",
+      confirmButtonColor: "#16a34a",
+      cancelButtonColor: "#6b7280",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const response = await api.post(
+        `/appointments/${appointmentId}/complete`,
+        {}
+      );
+
+      console.log("Complete appointment response:", response.data);
+
+      if (response.data.success) {
+        // Cập nhật appointment với status mới
+        applyUpdatedAppointment({
+          id: appointmentId,
+          appointmentId,
+          status: "COMPLETED",
+          completedAt: response.data.appointment?.completedAt,
+          completedByStaffId: response.data.appointment?.completedByStaff?.id,
+          completedByStaffName:
+            response.data.appointment?.completedByStaff?.name,
+          completedByStaffEmail:
+            response.data.appointment?.completedByStaff?.email,
+          completedByStaffPhone:
+            response.data.appointment?.completedByStaff?.phone,
+        });
+
+        Swal.fire({
+          icon: "success",
+          title: "Thành công",
+          text: response.data.message || "Đã đánh dấu lịch hẹn hoàn thành",
+          confirmButtonColor: "#2563eb",
+          timer: 2000,
+        });
+
+        // Refresh danh sách appointments
+        fetchAppointments();
+      }
+    } catch (error) {
+      console.error("Error completing appointment:", error);
+      const axiosError = error as {
+        response?: {
+          data?: {
+            message?: string;
+            error?: string;
+          };
+        };
+      };
+
+      const errorMessage =
+        axiosError.response?.data?.message ||
+        axiosError.response?.data?.error ||
+        "Không thể hoàn thành lịch hẹn. Vui lòng thử lại.";
+
+      Swal.fire({
+        icon: "error",
+        title: "Lỗi",
+        text: errorMessage,
         confirmButtonColor: "#2563eb",
       });
     }
@@ -2325,6 +2444,27 @@ const AppointmentManagement: React.FC = () => {
                           </span>
                         </button>
 
+                        {/* Button Hoàn thành chỉ hiển thị cho appointment type AUCTION */}
+                        {appointment.appointmentType === "AUCTION" &&
+                          [
+                            "PENDING",
+                            "PENDING_CONFIRMATION",
+                            "CONFIRMED",
+                          ].includes(appointment.status) && (
+                            <button
+                              onClick={() =>
+                                handleCompleteAppointment(appointment)
+                              }
+                              className="text-green-600 hover:text-green-900 relative group"
+                              title="Hoàn thành lịch hẹn"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                Hoàn thành
+                              </span>
+                            </button>
+                          )}
+
                         {appointment.status === "COMPLETED" &&
                           appointment.type !== "VEHICLE_INSPECTION" &&
                           !(
@@ -2421,101 +2561,101 @@ const AppointmentManagement: React.FC = () => {
         selectedAppointment &&
         selectedAppointment.type !== "VEHICLE_INSPECTION" && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">
-                Chi tiết lịch hẹn
-              </h2>
-              <button
-                onClick={closeModal}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <XCircle className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-6">
-              {/* Thông tin xe và giao dịch */}
-              <div className="mb-6 grid grid-cols-2 gap-4">
-                {/* Card trái: Thông tin xe */}
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                    Thông tin xe
-                  </h3>
-                  <div className="space-y-2">
-                    <p className="text-gray-700">
-                      <span className="font-medium">Xe:</span>{" "}
-                      {selectedAppointment.vehicle?.make || "N/A"}{" "}
-                      {selectedAppointment.vehicle?.model || "N/A"}{" "}
-                      {selectedAppointment.vehicle?.year || "N/A"}
-                    </p>
-                    <p className="text-gray-700">
-                      <span className="font-medium">Tiêu đề:</span>{" "}
-                      {selectedAppointment.vehicle?.title || "N/A"}
-                    </p>
-                    <p className="text-gray-700">
-                      <span className="font-medium">Thời gian:</span>{" "}
-                      {formatDate(selectedAppointment.scheduledDate)}
-                    </p>
-                    <p className="text-gray-700">
-                      <span className="font-medium">Địa điểm:</span>{" "}
-                      {selectedAppointment.location}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Card phải: Thông tin giao dịch */}
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                    Thông tin giao dịch
-                  </h3>
-                  <div className="space-y-2">
-                    <p className="text-gray-700">
-                      <span className="font-medium">Giá xe:</span>{" "}
-                      {(
-                        selectedAppointment.transaction?.vehiclePrice ||
-                        selectedAppointment.vehicle?.price ||
-                        0
-                      ).toLocaleString("vi-VN")}{" "}
-                      VNĐ
-                    </p>
-                    <p className="text-gray-700">
-                      <span className="font-medium">Tiền đặt cọc:</span>{" "}
-                      {(
-                        selectedAppointment.transaction?.depositAmount || 0
-                      ).toLocaleString("vi-VN")}{" "}
-                      VNĐ{" "}
-                      {selectedAppointment.transaction?.depositPercentage
-                        ? `(${selectedAppointment.transaction.depositPercentage})`
-                        : ""}
-                    </p>
-                    <p className="text-gray-700">
-                      <span className="font-medium">Số tiền còn lại:</span>{" "}
-                      {(
-                        selectedAppointment.transaction?.remainingAmount || 0
-                      ).toLocaleString("vi-VN")}{" "}
-                      VNĐ
-                    </p>
-                    {/* Hiển thị nhân viên xử lý chỉ khi COMPLETED */}
-                    {selectedAppointment.status === "COMPLETED" && (
-                      <p className="text-gray-700 mt-2">
-                        <span className="font-medium">Nhân viên xử lý:</span>{" "}
-                        {selectedAppointment.staff ? (
-                          <span className="font-semibold text-purple-600">
-                            {selectedAppointment.staff.name}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 italic">
-                            Chưa phân công
-                          </span>
-                        )}
-                      </p>
-                    )}
-                  </div>
-                </div>
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Chi tiết lịch hẹn
+                </h2>
+                <button
+                  onClick={closeModal}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XCircle className="w-6 h-6" />
+                </button>
               </div>
+
+              {/* Content */}
+              <div className="p-6">
+                {/* Thông tin xe và giao dịch */}
+                <div className="mb-6 grid grid-cols-2 gap-4">
+                  {/* Card trái: Thông tin xe */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                      Thông tin xe
+                    </h3>
+                    <div className="space-y-2">
+                      <p className="text-gray-700">
+                        <span className="font-medium">Xe:</span>{" "}
+                        {selectedAppointment.vehicle?.make || "N/A"}{" "}
+                        {selectedAppointment.vehicle?.model || "N/A"}{" "}
+                        {selectedAppointment.vehicle?.year || "N/A"}
+                      </p>
+                      <p className="text-gray-700">
+                        <span className="font-medium">Tiêu đề:</span>{" "}
+                        {selectedAppointment.vehicle?.title || "N/A"}
+                      </p>
+                      <p className="text-gray-700">
+                        <span className="font-medium">Thời gian:</span>{" "}
+                        {formatDate(selectedAppointment.scheduledDate)}
+                      </p>
+                      <p className="text-gray-700">
+                        <span className="font-medium">Địa điểm:</span>{" "}
+                        {selectedAppointment.location}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Card phải: Thông tin giao dịch */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                      Thông tin giao dịch
+                    </h3>
+                    <div className="space-y-2">
+                      <p className="text-gray-700">
+                        <span className="font-medium">Giá xe:</span>{" "}
+                        {(
+                          selectedAppointment.transaction?.vehiclePrice ||
+                          selectedAppointment.vehicle?.price ||
+                          0
+                        ).toLocaleString("vi-VN")}{" "}
+                        VNĐ
+                      </p>
+                      <p className="text-gray-700">
+                        <span className="font-medium">Tiền đặt cọc:</span>{" "}
+                        {(
+                          selectedAppointment.transaction?.depositAmount || 0
+                        ).toLocaleString("vi-VN")}{" "}
+                        VNĐ{" "}
+                        {selectedAppointment.transaction?.depositPercentage
+                          ? `(${selectedAppointment.transaction.depositPercentage})`
+                          : ""}
+                      </p>
+                      <p className="text-gray-700">
+                        <span className="font-medium">Số tiền còn lại:</span>{" "}
+                        {(
+                          selectedAppointment.transaction?.remainingAmount || 0
+                        ).toLocaleString("vi-VN")}{" "}
+                        VNĐ
+                      </p>
+                      {/* Hiển thị nhân viên xử lý chỉ khi COMPLETED */}
+                      {selectedAppointment.status === "COMPLETED" && (
+                        <p className="text-gray-700 mt-2">
+                          <span className="font-medium">Nhân viên xử lý:</span>{" "}
+                          {selectedAppointment.staff ? (
+                            <span className="font-semibold text-purple-600">
+                              {selectedAppointment.staff.name}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 italic">
+                              Chưa phân công
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
                 {renderConfirmationSection()}
 
@@ -3105,7 +3245,9 @@ const AppointmentManagement: React.FC = () => {
                               {selectedAppointment.seller?.email || "N/A"}
                             </p>
                             <p className="text-gray-700 mt-2">
-                              <span className="font-medium">Số điện thoại:</span>{" "}
+                              <span className="font-medium">
+                                Số điện thoại:
+                              </span>{" "}
                               {selectedAppointment.seller?.phone || "N/A"}
                             </p>
                           </div>
@@ -3126,7 +3268,9 @@ const AppointmentManagement: React.FC = () => {
                               {selectedAppointment.buyer?.email || "N/A"}
                             </p>
                             <p className="text-gray-700 mt-2">
-                              <span className="font-medium">Số điện thoại:</span>{" "}
+                              <span className="font-medium">
+                                Số điện thoại:
+                              </span>{" "}
                               {selectedAppointment.buyer?.phone || "N/A"}
                             </p>
                           </div>
@@ -3607,24 +3751,48 @@ const AppointmentManagement: React.FC = () => {
                   </div>
                 )}
 
-                {/* Buttons: Giữ xe và Mua ngay */}
+                {/* Buttons: Complete cho AUCTION hoặc Giữ xe/Mua ngay cho các loại khác */}
                 {selectedAppointment.type !== "CONTRACT_NOTARIZATION" &&
-                  selectedAppointment.type !== "VEHICLE_HANDOVER" &&
-                  selectedAppointment.status === "CONFIRMED" && (
-                    <div className="mt-6 flex items-center justify-center gap-3">
-                      <button
-                        onClick={handleHoldVehicle}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-                      >
-                        Giữ xe
-                      </button>
-                      <button
-                        onClick={handleBuyNow}
-                        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
-                      >
-                        Mua ngay
-                      </button>
-                    </div>
+                  selectedAppointment.type !== "VEHICLE_HANDOVER" && (
+                    <>
+                      {/* Button Complete cho appointment type AUCTION */}
+                      {selectedAppointment.appointmentType === "AUCTION" &&
+                        [
+                          "PENDING",
+                          "PENDING_CONFIRMATION",
+                          "CONFIRMED",
+                        ].includes(selectedAppointment.status) && (
+                          <div className="mt-6 flex items-center justify-center">
+                            <button
+                              onClick={() =>
+                                handleCompleteAppointment(selectedAppointment)
+                              }
+                              className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold text-lg shadow-lg"
+                            >
+                              Hoàn thành
+                            </button>
+                          </div>
+                        )}
+
+                      {/* Buttons Giữ xe và Mua ngay cho các loại khác (không phải AUCTION) */}
+                      {selectedAppointment.appointmentType !== "AUCTION" &&
+                        selectedAppointment.status === "CONFIRMED" && (
+                          <div className="mt-6 flex items-center justify-center gap-3">
+                            <button
+                              onClick={handleHoldVehicle}
+                              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                            >
+                              Giữ xe
+                            </button>
+                            <button
+                              onClick={handleBuyNow}
+                              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+                            >
+                              Mua ngay
+                            </button>
+                          </div>
+                        )}
+                    </>
                   )}
 
                 {/* Nút Thanh toán phần còn lại khi status là AWAITING_REMAINING_PAYMENT */}
